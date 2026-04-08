@@ -30,37 +30,45 @@ export function Layout() {
       </main>
       <footer className="border-t border-[var(--color-border)] py-6 text-center text-sm text-[var(--color-muted)]">
         <div>Recipes from the community library · Open Recipe Standard</div>
-        <p className="mt-3 max-w-xl mx-auto px-4 leading-relaxed">
-          To contribute, add one JSON file per recipe under{" "}
-          <span className="font-mono text-[0.9em]">recipes/</span> in{" "}
-          <a
-            href={`${repoWeb}#contributing`}
-            target="_blank"
-            rel="noreferrer"
-            className="text-[var(--color-accent)] hover:underline"
-          >
-            the library on GitHub
-          </a>{" "}
-          and open a pull request.{" "}
-          <a
-            href="https://github.com/OpenRecipeStandard"
-            target="_blank"
-            rel="noreferrer"
-            className="text-[var(--color-accent)] hover:underline"
-          >
-            Open Recipe Standard
-          </a>{" "}
-          ·{" "}
-          <a
-            href="https://edit.food-for-eating.com"
-            target="_blank"
-            rel="noreferrer"
-            className="text-[var(--color-accent)] hover:underline"
-          >
-            Recipe editor
-          </a>
-          .
-        </p>
+        <div className="mt-3 max-w-xl mx-auto px-4 space-y-2 leading-relaxed text-left sm:text-center">
+          <p>
+            <span className="text-[var(--color-ink)] font-medium">
+              Dedicated editor:
+            </span>{" "}
+            <a
+              href="https://edit.food-for-eating.com"
+              target="_blank"
+              rel="noreferrer"
+              className="text-[var(--color-accent)] font-semibold hover:underline"
+            >
+              Open Recipe Editor
+            </a>{" "}
+            — create and validate Open Recipe Standard JSON in your browser
+            before you submit.
+          </p>
+          <p>
+            To publish, add one JSON file per recipe under{" "}
+            <span className="font-mono text-[0.9em]">recipes/</span> in{" "}
+            <a
+              href={`${repoWeb}#contributing`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[var(--color-accent)] hover:underline"
+            >
+              the library on GitHub
+            </a>{" "}
+            and open a pull request.{" "}
+            <a
+              href="https://github.com/OpenRecipeStandard"
+              target="_blank"
+              rel="noreferrer"
+              className="text-[var(--color-accent)] hover:underline"
+            >
+              Open Recipe Standard
+            </a>{" "}
+            (schema).
+          </p>
+        </div>
       </footer>
     </div>
   );

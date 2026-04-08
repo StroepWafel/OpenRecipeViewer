@@ -5,10 +5,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  renderHomeOgPngBuffer,
-  renderRecipeOgPngBuffer,
-} from "./og-image.mjs";
+import { renderHomeOgPngBuffer } from "./og-image.mjs";
+import { createRecipeOgPool } from "./og-pool.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.join(__dirname, "..", "dist");
@@ -247,29 +245,32 @@ async function main() {
     await renderHomeOgPngBuffer()
   );
 
+  const ogPool = createRecipeOgPool();
+  console.log(`prerender: OG images using ${ogPool.size} worker thread(s).`);
   let n = 0;
-  for (const rel of paths) {
-    const key = encodeRecipePath(rel);
-    let recipe;
-    try {
-      recipe = await fetchJson(`${rawBase}/${rel.replace(/^\/+/, "")}`);
-    } catch {
-      continue;
-    }
-    const title =
-      typeof recipe.recipe_name === "string"
-        ? recipe.recipe_name
-        : "Recipe";
-    const desc = escapeHtml(recipeMetaDescription(recipe));
-    const pathSeg = `/r/${key}`;
-    const canonicalUrl = siteUrl ? `${siteUrl}${pathSeg}` : pathSeg;
-    const ogFile = `${key}.png`;
-    const pngBuf = await renderRecipeOgPngBuffer(title);
-    fs.writeFileSync(path.join(ogDir, ogFile), pngBuf);
-    const og = ogImageUrl(ogFile);
-    const imageForLd = siteUrl ? og : undefined;
-    const jsonLd = jsonLdRecipe(recipe, rel, canonicalUrl, imageForLd);
-    const headBlock = `
+  try {
+    for (const rel of paths) {
+      const key = encodeRecipePath(rel);
+      let recipe;
+      try {
+        recipe = await fetchJson(`${rawBase}/${rel.replace(/^\/+/, "")}`);
+      } catch {
+        continue;
+      }
+      const title =
+        typeof recipe.recipe_name === "string"
+          ? recipe.recipe_name
+          : "Recipe";
+      const desc = escapeHtml(recipeMetaDescription(recipe));
+      const pathSeg = `/r/${key}`;
+      const canonicalUrl = siteUrl ? `${siteUrl}${pathSeg}` : pathSeg;
+      const ogFile = `${key}.png`;
+      const pngBuf = await ogPool.run(title);
+      fs.writeFileSync(path.join(ogDir, ogFile), pngBuf);
+      const og = ogImageUrl(ogFile);
+      const imageForLd = siteUrl ? og : undefined;
+      const jsonLd = jsonLdRecipe(recipe, rel, canonicalUrl, imageForLd);
+      const headBlock = `
     <title>${escapeHtml(title)} · Open Recipe Library</title>
     <meta name="description" content="${desc}" />
     <link rel="canonical" href="${escapeHtml(canonicalUrl)}" />
@@ -291,23 +292,26 @@ async function main() {
     <script type="application/ld+json">${jsonLd}</script>
     `;
 
-    let html = shell;
-    if (html.includes("</head>")) {
-      html = html.replace("</head>", `${headBlock}</head>`);
-    } else {
-      html = headBlock + html;
-    }
-    const ns = noscriptArticle(recipe);
-    if (html.includes('<div id="root"></div>')) {
-      html = html.replace('<div id="root"></div>', `${ns}<div id="root"></div>`);
-    } else if (html.includes("<body")) {
-      html = html.replace("<body>", `<body>${ns}`);
-    }
+      let html = shell;
+      if (html.includes("</head>")) {
+        html = html.replace("</head>", `${headBlock}</head>`);
+      } else {
+        html = headBlock + html;
+      }
+      const ns = noscriptArticle(recipe);
+      if (html.includes('<div id="root"></div>')) {
+        html = html.replace('<div id="root"></div>', `${ns}<div id="root"></div>`);
+      } else if (html.includes("<body")) {
+        html = html.replace("<body>", `<body>${ns}`);
+      }
 
-    const outDir = path.join(dist, "r", key);
-    fs.mkdirSync(outDir, { recursive: true });
-    fs.writeFileSync(path.join(outDir, "index.html"), html, "utf8");
-    n += 1;
+      const outDir = path.join(dist, "r", key);
+      fs.mkdirSync(outDir, { recursive: true });
+      fs.writeFileSync(path.join(outDir, "index.html"), html, "utf8");
+      n += 1;
+    }
+  } finally {
+    ogPool.destroy();
   }
   console.log(`prerender: wrote ${n} recipe HTML file(s).`);
 

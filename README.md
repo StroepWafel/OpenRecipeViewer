@@ -80,15 +80,25 @@ Set the document `$id` / hosting URL to match where you deploy that file.
 
 Serve `dist/` as a static site. Client routes such as `/m/:mealSlug` must fall back to `index.html` when there is no matching file.
 
+### Deploying with Git (e.g. Cloudflare Pages)
+
+Typical flow: push to your Git host, then let the platform build from the repo.
+
+1. **Connect the repository** in your host (e.g. Cloudflare Dashboard → Workers & Pages → Create → Pages → Connect to Git).
+2. **Build settings**
+   - **Build command:** `npm run build`
+   - **Build output directory:** `dist`
+   - **Root directory:** `/` (repo root), unless this app lives in a monorepo subfolder.
+3. **Environment variables** — add the same `VITE_*` values you use locally (Production, and Preview if you want previews to match).
+4. **SPA routing** — on [Cloudflare Pages](https://developers.cloudflare.com/pages/configuration/serving-pages/#single-page-application-spa-rendering), if there is **no** top-level `404.html` in the build output, Pages treats the site as an SPA and serves the app shell for unknown paths (so you usually do **not** need `_redirects` or `wrangler.toml` for Git deploys). Avoid adding a root `404.html` unless you intentionally want classic 404 behavior instead.
+
+`wrangler.toml` in this repo is optional for Git-based Pages deploys; it matters if you deploy with **`wrangler deploy`** (Workers + assets) from CI or your machine.
+
 ### Cloudflare Workers (`wrangler deploy`)
 
-This repo includes [`wrangler.toml`](wrangler.toml) with [`assets.not_found_handling = "single-page-application"`](https://developers.cloudflare.com/workers/static-assets/routing/single-page-application/), so you do **not** need a `_redirects` file. (A rule like `/* /index.html 200` is rejected by the Workers API as error **10021** — infinite loop.)
+If you deploy with Wrangler instead of Pages Git builds, this repo includes [`wrangler.toml`](wrangler.toml) with [`assets.not_found_handling = "single-page-application"`](https://developers.cloudflare.com/workers/static-assets/routing/single-page-application/) so you do **not** need a `_redirects` file. (A rule like `/* /index.html 200` is rejected by the Workers API as error **10021** — infinite loop.)
 
 Set `name` in `wrangler.toml` to your Worker name if it differs from `openrecipeviewer`.
-
-### Cloudflare Pages (Git integration)
-
-In the Pages project settings, enable SPA / “serve `index.html` for non-file routes”, or add an equivalent redirect rule in the dashboard. Do not rely on the legacy `_redirects` pattern above if your host validates it the same way as Workers.
 
 ## Daily deploy hook (optional)
 

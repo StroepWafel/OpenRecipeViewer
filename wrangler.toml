@@ -1,0 +1,10 @@
+# Cloudflare Workers (Static Assets) — SPA fallback without _redirects
+# (/* /index.html 200 is rejected by the API as error 10021 — infinite loop.)
+# https://developers.cloudflare.com/workers/static-assets/routing/single-page-application/
+
+name = "openrecipeviewer"
+compatibility_date = "2025-04-01"
+
+[assets]
+directory = "./dist/"
+not_found_handling = "single-page-application"

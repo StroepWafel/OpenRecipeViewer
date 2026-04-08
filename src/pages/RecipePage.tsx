@@ -25,6 +25,7 @@ import {
 import { libraryBackFromState } from "@/lib/library-nav";
 import { decodeRecipePath, encodeRecipePath } from "@/lib/path-encoding";
 import { recipeJsonLd, recipeMetaDescription } from "@/lib/jsonld-recipe";
+import { ogImageAbsoluteUrl, recipeOgFileName } from "@/lib/og";
 import { similarRecipePaths } from "@/lib/similar-recipes";
 import { recipeName } from "@/lib/recipe-types";
 import type { RecordStr } from "@/lib/recipe-types";
@@ -267,6 +268,13 @@ export function RecipePage() {
   const origin = siteOrigin();
   const canonicalPath = `/r/${encodeRecipePath(relativePath)}`;
   const canonical = origin ? `${origin}${canonicalPath}` : canonicalPath;
+  const ogImage =
+    origin && relativePath
+      ? ogImageAbsoluteUrl(
+          origin,
+          recipeOgFileName(encodeRecipePath(relativePath))
+        )
+      : "";
   const baseYieldAmount = parseBaseYieldAmount(
     recipe.base_yield as RecordStr | undefined
   );
@@ -367,6 +375,17 @@ export function RecipePage() {
         <meta property="og:description" content={desc} />
         <meta property="og:type" content="article" />
         {origin ? <meta property="og:url" content={canonical} /> : null}
+        {ogImage ? (
+          <>
+            <meta property="og:image" content={ogImage} />
+            <meta property="og:image:width" content="1200" />
+            <meta property="og:image:height" content="630" />
+            <meta name="twitter:card" content="summary_large_image" />
+            <meta name="twitter:title" content={name} />
+            <meta name="twitter:description" content={desc} />
+            <meta name="twitter:image" content={ogImage} />
+          </>
+        ) : null}
         <script type="application/ld+json">{jsonLd}</script>
       </Helmet>
 

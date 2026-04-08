@@ -5,14 +5,47 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  renderHomeOgPngBuffer,
+  renderRecipeOgPngBuffer,
+} from "./og-image.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.join(__dirname, "..", "dist");
+const repoRoot = path.join(__dirname, "..");
 
 const owner = process.env.VITE_LIBRARY_OWNER ?? "stroepwafel";
 const repo = process.env.VITE_LIBRARY_REPO ?? "OpenRecipeLibrary";
 const ref = process.env.VITE_LIBRARY_REF ?? "library";
 const siteUrl = (process.env.VITE_SITE_URL ?? "").replace(/\/+$/, "");
+
+const ogImageVersion = JSON.parse(
+  fs.readFileSync(
+    path.join(repoRoot, "src", "og-image-version.json"),
+    "utf8"
+  )
+).version;
+
+function viteBasePrefix() {
+  const bp = process.env.VITE_BASE_PATH ?? "/";
+  if (bp === "/" || bp === "") return "";
+  return bp.replace(/\/+$/, "");
+}
+
+/** Absolute or root-relative URL for an OG PNG (matches `src/lib/og.ts`). */
+function ogImageUrl(fileName) {
+  const base = viteBasePrefix();
+  const pathSeg = `${base}/og/${fileName}?v=${ogImageVersion}`;
+  if (siteUrl) return `${siteUrl}${pathSeg}`;
+  return pathSeg;
+}
+
+function homeCanonicalUrl() {
+  if (!siteUrl) return "";
+  const p = viteBasePrefix();
+  if (!p) return `${siteUrl}/`;
+  return `${siteUrl}${p}/`;
+}
 
 const rawBase = `https://raw.githubusercontent.com/${owner}/${repo}/${ref}`;
 
@@ -109,7 +142,7 @@ function recipeMetaDescription(recipe) {
     tail).slice(0, 300);
 }
 
-function jsonLdRecipe(recipe, relativePath, canonicalUrl) {
+function jsonLdRecipe(recipe, relativePath, canonicalUrl, imageUrl) {
   const name =
     typeof recipe.recipe_name === "string" ? recipe.recipe_name : "Recipe";
   const ingredients = Array.isArray(recipe.ingredients)
@@ -130,6 +163,7 @@ function jsonLdRecipe(recipe, relativePath, canonicalUrl) {
     name,
     url: canonicalUrl,
   };
+  if (imageUrl) obj.image = imageUrl;
   if (ingredients.length) obj.recipeIngredient = ingredients;
   if (steps.length) {
     obj.recipeInstructions = steps.map((text) => ({
@@ -206,6 +240,13 @@ async function main() {
     process.exit(0);
   }
 
+  const ogDir = path.join(dist, "og");
+  fs.mkdirSync(ogDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(ogDir, "home.png"),
+    await renderHomeOgPngBuffer()
+  );
+
   let n = 0;
   for (const rel of paths) {
     const key = encodeRecipePath(rel);
@@ -222,7 +263,12 @@ async function main() {
     const desc = escapeHtml(recipeMetaDescription(recipe));
     const pathSeg = `/r/${key}`;
     const canonicalUrl = siteUrl ? `${siteUrl}${pathSeg}` : pathSeg;
-    const jsonLd = jsonLdRecipe(recipe, rel, canonicalUrl);
+    const ogFile = `${key}.png`;
+    const pngBuf = await renderRecipeOgPngBuffer(title);
+    fs.writeFileSync(path.join(ogDir, ogFile), pngBuf);
+    const og = ogImageUrl(ogFile);
+    const imageForLd = siteUrl ? og : undefined;
+    const jsonLd = jsonLdRecipe(recipe, rel, canonicalUrl, imageForLd);
     const headBlock = `
     <title>${escapeHtml(title)} · Open Recipe Library</title>
     <meta name="description" content="${desc}" />
@@ -230,6 +276,18 @@ async function main() {
     <meta property="og:title" content="${escapeHtml(title)}" />
     <meta property="og:description" content="${desc}" />
     <meta property="og:type" content="article" />
+    <meta property="og:image" content="${escapeHtml(og)}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    ${
+      siteUrl
+        ? `<meta property="og:url" content="${escapeHtml(canonicalUrl)}" />`
+        : ""
+    }
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${escapeHtml(title)}" />
+    <meta name="twitter:description" content="${desc}" />
+    <meta name="twitter:image" content="${escapeHtml(og)}" />
     <script type="application/ld+json">${jsonLd}</script>
     `;
 
@@ -252,6 +310,39 @@ async function main() {
     n += 1;
   }
   console.log(`prerender: wrote ${n} recipe HTML file(s).`);
+
+  const homeDescRaw =
+    "Browse Open Recipe Standard recipes by meal type from the public library on GitHub.";
+  const homeDesc = escapeHtml(homeDescRaw);
+  const homeTitle = "Open Recipe Library";
+  const homeOg = ogImageUrl("home.png");
+  const homeCanon = homeCanonicalUrl();
+  const homeBlock = `    <meta property="og:title" content="${escapeHtml(homeTitle)}" />
+    <meta property="og:description" content="${homeDesc}" />
+    <meta property="og:type" content="website" />
+    ${
+      homeCanon
+        ? `<meta property="og:url" content="${escapeHtml(homeCanon)}" />`
+        : ""
+    }
+    <meta property="og:image" content="${escapeHtml(homeOg)}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${escapeHtml(homeTitle)}" />
+    <meta name="twitter:description" content="${homeDesc}" />
+    <meta name="twitter:image" content="${escapeHtml(homeOg)}" />
+`;
+  let homeHtml = fs.readFileSync(indexPath, "utf8");
+  if (homeHtml.includes("</head>")) {
+    homeHtml = homeHtml.replace("</head>", `${homeBlock}</head>`);
+  }
+  homeHtml = homeHtml.replace(
+    /<meta\s+name="description"\s+content="[^"]*"\s*\/>/,
+    `<meta name="description" content="${homeDesc}" />`
+  );
+  fs.writeFileSync(indexPath, homeHtml, "utf8");
+  console.log("prerender: patched index.html with default OG tags.");
 }
 
 main().catch((e) => {

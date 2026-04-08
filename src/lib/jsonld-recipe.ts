@@ -6,6 +6,7 @@ import {
   recipeName,
 } from "./recipe-types";
 import { siteOrigin } from "./library-api";
+import { ogImageAbsoluteUrl, recipeOgFileName } from "./og";
 import { encodeRecipePath } from "./path-encoding";
 
 export function recipeJsonLd(
@@ -35,6 +36,9 @@ export function recipeJsonLd(
     name,
     url,
   };
+  if (origin) {
+    obj.image = ogImageAbsoluteUrl(origin, recipeOgFileName(key));
+  }
   if (ingredients.length) obj.recipeIngredient = ingredients;
   if (steps.length) {
     obj.recipeInstructions = steps.map((text) => ({

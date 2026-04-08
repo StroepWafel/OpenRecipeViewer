@@ -4,8 +4,10 @@ import { Helmet } from "react-helmet-async";
 import {
   collectRecipePaths,
   fetchLibraryIndex,
+  siteOrigin,
   type LibraryList,
 } from "@/lib/library-api";
+import { ogImageAbsoluteUrl } from "@/lib/og";
 import { mealIndexEntries } from "@/lib/meal-routes";
 
 export function HomePage() {
@@ -36,14 +38,31 @@ export function HomePage() {
   const paths = index ? collectRecipePaths(index) : [];
   const meals = index ? mealIndexEntries(index) : [];
 
+  const origin = siteOrigin();
+  const homeDesc =
+    "Browse Open Recipe Standard recipes by meal type from the public library on GitHub.";
+  const homeOg =
+    origin ? ogImageAbsoluteUrl(origin, "home.png") : "";
+
   return (
     <>
       <Helmet>
         <title>Open Recipe Library</title>
-        <meta
-          name="description"
-          content="Browse Open Recipe Standard recipes by meal type from the public library on GitHub."
-        />
+        <meta name="description" content={homeDesc} />
+        {homeOg ? (
+          <>
+            <meta property="og:title" content="Open Recipe Library" />
+            <meta property="og:description" content={homeDesc} />
+            <meta property="og:type" content="website" />
+            <meta property="og:image" content={homeOg} />
+            <meta property="og:image:width" content="1200" />
+            <meta property="og:image:height" content="630" />
+            <meta name="twitter:card" content="summary_large_image" />
+            <meta name="twitter:title" content="Open Recipe Library" />
+            <meta name="twitter:description" content={homeDesc} />
+            <meta name="twitter:image" content={homeOg} />
+          </>
+        ) : null}
       </Helmet>
 
       <div className="max-w-2xl">

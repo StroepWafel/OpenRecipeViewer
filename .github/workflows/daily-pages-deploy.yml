@@ -1,0 +1,23 @@
+# Triggers a Cloudflare Pages production deploy so prerender picks up the latest library branch.
+# Add repository secret CLOUDFLARE_PAGES_DEPLOY_HOOK with your hook URL from:
+# Cloudflare Dashboard → Pages → your project → Settings → Builds & deployments → Deploy hooks
+name: Daily Cloudflare Pages deploy
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Pages deploy hook
+        env:
+          HOOK: ${{ secrets.CLOUDFLARE_PAGES_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "CLOUDFLARE_PAGES_DEPLOY_HOOK secret is not set; skipping."
+            exit 0
+          fi
+          curl -fsS -X POST "$HOOK"

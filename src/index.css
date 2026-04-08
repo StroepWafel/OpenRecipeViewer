@@ -1,0 +1,64 @@
+@import "tailwindcss";
+@import "@fontsource/source-sans-3/400.css";
+@import "@fontsource/source-sans-3/500.css";
+@import "@fontsource/source-sans-3/600.css";
+
+@theme {
+  --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  --color-canvas: #f0f4f8;
+  --color-paper: #fdfefe;
+  --color-ink: #0f172a;
+  --color-muted: #475569;
+  --color-border: #cbd5e1;
+  --color-accent: #0d9488;
+  --color-accent-soft: #ccfbf1;
+  --radius-card: 0.75rem;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Reading-optimized recipe prose */
+.recipe-prose {
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  max-width: 42rem;
+}
+
+.recipe-prose h1 {
+  font-size: 1.875rem;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.recipe-prose.cooking {
+  font-size: 1.25rem;
+  line-height: 1.55;
+  max-width: 48rem;
+}
+
+.recipe-prose.cooking .steps {
+  font-size: 1.35rem;
+  line-height: 1.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,479 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://food-for-eating.com/schema/open-recipe.schema.json",
+  "title": "Open Recipe Standard",
+  "$comment": "Normative JSON Schema for the Open Recipe Standard: a portable, vendor-neutral format for encoding recipes for interchange between applications and libraries. Mass, duration, temperature, and count use SI / metric conventions (unit_system metric). Volume may use metric units (ml, cl, L) or US customary kitchen measures (tsp, tbsp, cup) with unit_system us_customary. Optional metadata includes categories, cor, cuisine, tags, dietary/allergen hints, skill level, meal type, equipment, and active/prep/total times. For ingredient amounts, unit follows the allowlist for each quantity_kind. For base_yield when quantity_kind is count, unit is a free-form label. Provisional fields use keys matching ^X-.",
+  "type": "object",
+  "required": ["recipe_name"],
+  "properties": {
+    "recipe_name": {
+      "type": "string",
+      "description": "Name of this recipe."
+    },
+    "recipe_uuid": {
+      "type": "string",
+      "description": "Stable identifier (e.g. vendor prefix + unique id) for this recipe instance."
+    },
+    "recipe_authors": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "People credited as creating or writing this recipe (the culinary author(s)). Use for originals and general attribution. When the text comes from a book or site, source_authors may match or overlap; source_authors ties authorship to that publication."
+    },
+    "notes": {
+      "$ref": "#/$defs/NotesList",
+      "description": "Recipe-level notes."
+    },
+    "categories": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "High-level categorical tags for filtering and UI. Examples: taste (sweet, savoury, spicy, mild, umami); course (appetizer, starter, mains, side, dessert, snack); meal time (breakfast, brunch, lunch, dinner); style (comfort_food, kid_friendly, quick, make_ahead, one_pot, baked, grilled, fried, steamed, raw). Open vocabulary; keep spelling consistent in a dataset."
+    },
+    "cor": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Country of recipe (COR): countries or regions associated with the dish’s origin or style (e.g. France, Italy, Australia, China). Use display names or ISO 3166 codes; stay consistent within a dataset."
+    },
+    "cuisine": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Culinary tradition or style (often broader than cor), e.g. Italian, Mexican, Japanese, Middle Eastern, Nordic, Southern US. Open vocabulary."
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Search and discovery keywords: ingredients, techniques, themes (e.g. chocolate, summer, gluten-free-baking). Complements categories."
+    },
+    "dietary": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Dietary suitability labels, e.g. vegetarian, vegan, pescatarian, halal, kosher, gluten-free, dairy-free, nut-free, low-sodium, keto, paleo. Open vocabulary; not a substitute for allergen declarations."
+    },
+    "allergens": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Allergens present in the recipe (for consumer safety). Use consistent tokens in a dataset, e.g. milk, eggs, fish, crustaceans, molluscs, tree_nuts, peanuts, wheat, soy, sesame, mustard, lupin, celery, sulphites (align with local labeling rules as needed)."
+    },
+    "skill_level": {
+      "$ref": "#/$defs/SkillLevel",
+      "description": "Approximate difficulty for a typical home cook."
+    },
+    "meal_type": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/MealType" },
+      "description": "One or more meal or eating contexts, each chosen from the fixed MealType list."
+    },
+    "prep_time": {
+      "$ref": "#/$defs/DurationMeasurement",
+      "description": "Active preparation time (chopping, mixing) before cooking; quantity_kind duration."
+    },
+    "cook_time": {
+      "$ref": "#/$defs/DurationMeasurement",
+      "description": "Cooking or baking time (stove, oven, grill); quantity_kind duration."
+    },
+    "total_time": {
+      "$ref": "#/$defs/DurationMeasurement",
+      "description": "End-to-end time including prep, cook, and mandatory passive steps (rest, chill) if the author includes them; quantity_kind duration."
+    },
+    "equipment": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Tools or appliances assumed, e.g. oven, microwave, refrigerator, stand mixer, food processor, immersion blender, grill, wok."
+    },
+    "base_yield": {
+      "$ref": "#/$defs/YieldMeasurement",
+      "description": "What the written ingredient amounts produce. Only count, mass, or volume (not temperature or duration). For count output, unit is any non-empty label (e.g. cookies, muffins). For mass or volume, unit is a fixed code: metric (g, ml, …) or, for volume only, US customary tsp, tbsp, or cup (with unit_system us_customary). To scale: multiply each ingredient amount by (target_yield_amount / base_yield.amount) when comparable, or by an explicit scale factor."
+    },
+    "ingredients": {
+      "type": "array",
+      "description": "Ingredients in order of use; repeat lines when used at different stages. Each amount is for base_yield unless scaled at display time.",
+      "items": { "$ref": "#/$defs/Ingredient" }
+    },
+    "steps": {
+      "type": "array",
+      "description": "Ordered preparation steps.",
+      "items": { "$ref": "#/$defs/Step" }
+    },
+    "oven_fan": {
+      "type": "string",
+      "enum": ["Off", "Low", "High"],
+      "description": "Convection setting; if omitted, implementations may treat as Off."
+    },
+    "oven_temp": {
+      "$ref": "#/$defs/Measurement",
+      "description": "Starting oven temperature; quantity_kind temperature; unit C (degrees Celsius)."
+    },
+    "oven_time": {
+      "$ref": "#/$defs/Measurement",
+      "description": "Overall oven duration; quantity_kind duration; metric time units (min, s, h, etc.)."
+    },
+    "source_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL this recipe was taken from, if applicable."
+    },
+    "source_authors": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Author(s) credited on the external source (book, site, show), not the person who keyed the recipe into an app. Often aligns with recipe_authors when the source is the canonical attribution."
+    },
+    "source_book": { "$ref": "#/$defs/SourceBook" }
+  },
+  "patternProperties": {
+    "^X-": true
+  },
+  "additionalProperties": true,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "ingredients": {
+            "type": "array",
+            "minItems": 1
+          }
+        },
+        "required": ["ingredients"]
+      },
+      "then": {
+        "properties": {
+          "base_yield": { "$ref": "#/$defs/YieldMeasurement" }
+        },
+        "required": ["base_yield"]
+      }
+    }
+  ],
+  "$defs": {
+    "NotesList": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "SkillLevel": {
+      "type": "string",
+      "enum": ["beginner", "intermediate", "advanced"],
+      "description": "Relative difficulty for a typical home cook."
+    },
+    "MealType": {
+      "type": "string",
+      "enum": [
+        "breakfast",
+        "brunch",
+        "lunch",
+        "dinner",
+        "supper",
+        "snack",
+        "dessert",
+        "tea",
+        "appetizer",
+        "side"
+      ],
+      "description": "Meal or eating context: main mealtimes, snack/dessert, tea, first course, or side dish."
+    },
+    "QuantityKind": {
+      "type": "string",
+      "enum": ["mass", "volume", "count", "temperature", "duration"],
+      "description": "mass vs volume vs count; temperature (°C) and duration (s, min, h) for oven fields. Volume may use metric (ml, L) or US customary kitchen units (tsp, tbsp, cup); volume is never mass."
+    },
+    "UnitSystem": {
+      "type": "string",
+      "enum": ["metric", "us_customary"],
+      "description": "\"metric\" for SI / metric units and fixed count labels. \"us_customary\" only when quantity_kind is volume and unit is tsp, tbsp, or cup (US kitchen measures)."
+    },
+    "Measurement": {
+      "type": "object",
+      "description": "A quantity with explicit kind and unit_system. For volume, either metric units (ml, cl, L) with unit_system metric, or US customary tsp, tbsp, cup with unit_system us_customary. Other kinds use unit_system metric. Field unit must match quantity_kind (see allOf).",
+      "required": ["amount", "unit", "quantity_kind", "unit_system"],
+      "properties": {
+        "amount": {
+          "type": "number",
+          "description": "Numeric amount in the given unit."
+        },
+        "unit": {
+          "type": "string",
+          "description": "Unit code for this quantity_kind (see allOf allowlists). Volume may be metric or US customary (tsp, tbsp, cup)."
+        },
+        "quantity_kind": { "$ref": "#/$defs/QuantityKind" },
+        "unit_system": { "$ref": "#/$defs/UnitSystem" }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": { "quantity_kind": { "const": "mass" } },
+            "required": ["quantity_kind"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "unit": { "enum": ["mg", "g", "kg"] },
+              "unit_system": { "const": "metric" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "quantity_kind": { "const": "volume" } },
+            "required": ["quantity_kind"]
+          },
+          "then": {
+            "oneOf": [
+              {
+                "type": "object",
+                "description": "Metric volume.",
+                "properties": {
+                  "unit": { "enum": ["ml", "cl", "L"] },
+                  "unit_system": { "const": "metric" }
+                },
+                "required": ["unit", "unit_system"]
+              },
+              {
+                "type": "object",
+                "description": "US customary kitchen volume (teaspoon, tablespoon, US cup).",
+                "properties": {
+                  "unit": { "enum": ["tsp", "tbsp", "cup"] },
+                  "unit_system": { "const": "us_customary" }
+                },
+                "required": ["unit", "unit_system"]
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": { "quantity_kind": { "const": "count" } },
+            "required": ["quantity_kind"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "unit": {
+                "enum": [
+                  "each",
+                  "dozen",
+                  "serving",
+                  "servings",
+                  "portion",
+                  "portions",
+                  "cookie",
+                  "cookies",
+                  "slice",
+                  "slices",
+                  "egg",
+                  "eggs",
+                  "batch",
+                  "batches",
+                  "loaf",
+                  "loaves",
+                  "muffin",
+                  "muffins"
+                ]
+              },
+              "unit_system": { "const": "metric" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "quantity_kind": { "const": "temperature" } },
+            "required": ["quantity_kind"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "unit": { "enum": ["C"] },
+              "unit_system": { "const": "metric" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "quantity_kind": { "const": "duration" } },
+            "required": ["quantity_kind"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "unit": { "enum": ["ms", "s", "min", "h"] },
+              "unit_system": { "const": "metric" }
+            }
+          }
+        }
+      ]
+    },
+    "DurationMeasurement": {
+      "description": "A duration-only measurement for prep, cook, or total time. Uses quantity_kind duration and units ms, s, min, or h.",
+      "allOf": [
+        { "$ref": "#/$defs/Measurement" },
+        {
+          "type": "object",
+          "properties": {
+            "quantity_kind": { "const": "duration" }
+          }
+        }
+      ]
+    },
+    "YieldMeasurement": {
+      "description": "How much recipe output the written amounts represent: count, mass, or volume only. For count, unit is a free-form label (what is being counted). For mass or volume, unit follows the same rules as Measurement (metric or, for volume, US customary tsp/tbsp/cup with unit_system us_customary).",
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Output counted in discrete units; unit is any non-empty custom label (e.g. cookies, egg rolls, slices).",
+          "required": ["amount", "unit", "quantity_kind", "unit_system"],
+          "properties": {
+            "amount": {
+              "type": "number",
+              "description": "How many of the thing named by unit (e.g. 24 when unit is cookies)."
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Human-readable name for one counted item or batch (plural is fine), not limited to a fixed vocabulary."
+            },
+            "quantity_kind": { "const": "count" },
+            "unit_system": { "const": "metric" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Output as total mass or volume using metric units or US customary volume units (see Measurement).",
+          "required": ["amount", "unit", "quantity_kind", "unit_system"],
+          "allOf": [
+            { "$ref": "#/$defs/Measurement" },
+            {
+              "type": "object",
+              "properties": {
+                "quantity_kind": {
+                  "type": "string",
+                  "enum": ["mass", "volume"],
+                  "description": "Total mass or total volume of the recipe output."
+                }
+              }
+            }
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "IngredientSansSubstitutions": {
+      "type": "object",
+      "description": "Ingredient line without nested substitutions (used inside substitutions arrays).",
+      "required": ["name", "amount"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable ingredient name."
+        },
+        "amount": {
+          "$ref": "#/$defs/Measurement",
+          "description": "Amount for base_yield; scale with the recipe when changing batch size."
+        },
+        "processing": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Tags like whole, minced, large dice."
+        },
+        "notes": { "$ref": "#/$defs/NotesList" },
+        "usda_num": {
+          "type": "string",
+          "description": "USDA Standard Reference index key for nutrition lookup."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Ingredient": {
+      "type": "object",
+      "description": "Full ingredient line including optional substitutions.",
+      "required": ["name", "amount"],
+      "properties": {
+        "name": { "type": "string" },
+        "amount": { "$ref": "#/$defs/Measurement" },
+        "processing": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "notes": { "$ref": "#/$defs/NotesList" },
+        "usda_num": { "type": "string" },
+        "substitutions": {
+          "type": "array",
+          "description": "Same shape as an ingredient but without substitutions on nested items.",
+          "items": { "$ref": "#/$defs/IngredientSansSubstitutions" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Haccp": {
+      "description": "HACCP annotation: either control_point or critical_control_point, not both.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["control_point"],
+          "properties": {
+            "control_point": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["critical_control_point"],
+          "properties": {
+            "critical_control_point": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Step": {
+      "type": "object",
+      "required": ["step"],
+      "properties": {
+        "step": {
+          "type": "string",
+          "description": "Instruction text for this step."
+        },
+        "notes": { "$ref": "#/$defs/NotesList" },
+        "haccp": { "$ref": "#/$defs/Haccp" }
+      },
+      "additionalProperties": false
+    },
+    "SourceBook": {
+      "type": "object",
+      "properties": {
+        "authors": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Book author(s)."
+        },
+        "title": { "type": "string" },
+        "isbn": { "type": "string" },
+        "notes": { "$ref": "#/$defs/NotesList" }
+      },
+      "patternProperties": {
+        "^X-": true
+      },
+      "additionalProperties": true
+    }
+  }
+}

@@ -4,20 +4,14 @@ import { Helmet } from "react-helmet-async";
 import {
   collectRecipePaths,
   fetchLibraryIndex,
-  fetchRecipesBatched,
   type LibraryList,
-  type FetchRecipeResult,
 } from "@/lib/library-api";
-import { encodeRecipePath } from "@/lib/path-encoding";
-import { recipeName } from "@/lib/recipe-types";
-import type { RecordStr } from "@/lib/recipe-types";
+import { mealIndexEntries } from "@/lib/meal-routes";
 
 export function HomePage() {
   const [index, setIndex] = useState<LibraryList | null>(null);
-  const [byPath, setByPath] = useState<Map<string, RecordStr>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [failures, setFailures] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -26,21 +20,6 @@ export function HomePage() {
         const idx = await fetchLibraryIndex();
         if (cancelled) return;
         setIndex(idx);
-        const paths = collectRecipePaths(idx);
-        if (paths.length === 0) {
-          setLoading(false);
-          return;
-        }
-        const results = await fetchRecipesBatched(paths, 8);
-        if (cancelled) return;
-        const m = new Map<string, RecordStr>();
-        const bad: string[] = [];
-        for (const r of results as FetchRecipeResult[]) {
-          if (r.ok) m.set(r.path, r.recipe);
-          else bad.push(`${r.path}: ${r.error}`);
-        }
-        setByPath(m);
-        setFailures(bad);
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : String(e));
@@ -55,6 +34,7 @@ export function HomePage() {
   }, []);
 
   const paths = index ? collectRecipePaths(index) : [];
+  const meals = index ? mealIndexEntries(index) : [];
 
   return (
     <>
@@ -62,7 +42,7 @@ export function HomePage() {
         <title>Open Recipe Library</title>
         <meta
           name="description"
-          content="Browse Open Recipe Standard recipes from the public library on GitHub."
+          content="Browse Open Recipe Standard recipes by meal type from the public library on GitHub."
         />
       </Helmet>
 
@@ -78,11 +58,14 @@ export function HomePage() {
 
         {loading && (
           <p className="text-[var(--color-muted)]" role="status">
-            Loading recipes…
+            Loading…
           </p>
         )}
         {error && (
-          <p className="text-red-700 bg-red-50 border border-red-100 rounded-lg p-4" role="alert">
+          <p
+            className="text-red-700 bg-red-50 border border-red-100 rounded-lg p-4"
+            role="alert"
+          >
             {error}
           </p>
         )}
@@ -99,39 +82,37 @@ export function HomePage() {
             </a>
           </div>
         )}
-        {!loading && paths.length > 0 && (
-          <ul className="space-y-3 list-none p-0">
-            {paths.map((p) => {
-              const r = byPath.get(p);
-              const title = r ? recipeName(r) : p;
-              return (
+        {!loading && !error && paths.length > 0 && (
+          <section aria-labelledby="meals-heading">
+            <h2
+              id="meals-heading"
+              className="text-lg font-semibold text-[var(--color-ink)] mb-4"
+            >
+              Meal types
+            </h2>
+            <p className="text-sm text-[var(--color-muted)] mb-4">
+              A recipe can appear under more than one meal type when it lists
+              several in its metadata.
+            </p>
+            <ul className="space-y-3 list-none p-0">
+              {meals.map(({ key, slug, label, count }) => (
                 <li
-                  key={p}
+                  key={key}
                   className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-paper)] shadow-sm hover:border-[var(--color-accent)]/40 transition-colors"
                 >
                   <Link
-                    to={`/r/${encodeRecipePath(p)}`}
-                    className="block px-4 py-3 text-[var(--color-ink)] font-medium hover:text-[var(--color-accent)]"
+                    to={`/m/${slug}`}
+                    className="flex items-center justify-between gap-4 px-4 py-3 text-[var(--color-ink)] font-medium hover:text-[var(--color-accent)]"
                   >
-                    {title}
-                    <span className="block text-xs font-normal text-[var(--color-muted)] mt-1 truncate">
-                      {p}
+                    <span className="capitalize">{label}</span>
+                    <span className="text-sm font-normal text-[var(--color-muted)] tabular-nums shrink-0">
+                      {count} recipe{count === 1 ? "" : "s"}
                     </span>
                   </Link>
                 </li>
-              );
-            })}
-          </ul>
-        )}
-        {failures.length > 0 && (
-          <details className="mt-6 text-sm text-[var(--color-muted)]">
-            <summary>Some recipes failed to load ({failures.length})</summary>
-            <ul className="mt-2 list-disc pl-5">
-              {failures.slice(0, 10).map((f) => (
-                <li key={f}>{f}</li>
               ))}
             </ul>
-          </details>
+          </section>
         )}
       </div>
     </>

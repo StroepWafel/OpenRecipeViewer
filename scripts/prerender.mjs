@@ -50,6 +50,48 @@ function escapeHtml(s) {
     .replace(/"/g, "&quot;");
 }
 
+function recipeAuthorNames(recipe) {
+  const v = recipe.recipe_authors;
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((x) => typeof x === "string" && x.trim().length > 0)
+    .map((s) => s.trim());
+}
+
+function sourceAuthorNames(recipe) {
+  const v = recipe.source_authors;
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((x) => typeof x === "string" && x.trim().length > 0)
+    .map((s) => s.trim());
+}
+
+function authorNamesForSchema(recipe) {
+  const ra = recipeAuthorNames(recipe);
+  if (ra.length) return ra;
+  return sourceAuthorNames(recipe);
+}
+
+function yieldString(recipe) {
+  const by = recipe.base_yield;
+  if (!by || typeof by !== "object" || Array.isArray(by)) return "";
+  const amount = by.amount;
+  const unit = typeof by.unit === "string" ? by.unit : "";
+  let n;
+  if (typeof amount === "number" && Number.isFinite(amount)) {
+    n = amount;
+  } else if (typeof amount === "string") {
+    const p = parseFloat(amount);
+    n = Number.isFinite(p) ? p : NaN;
+  } else {
+    n = NaN;
+  }
+  if (!Number.isFinite(n)) return "";
+  const rounded =
+    Math.abs(n - Math.round(n)) < 1e-9 ? String(Math.round(n)) : String(n);
+  return unit ? `${rounded} ${unit}` : rounded;
+}
+
 function recipeMetaDescription(recipe) {
   const name =
     typeof recipe.recipe_name === "string" ? recipe.recipe_name : "Recipe";
@@ -80,6 +122,8 @@ function jsonLdRecipe(recipe, relativePath, canonicalUrl) {
         .map((s) => (s && typeof s.step === "string" ? s.step : ""))
         .filter(Boolean)
     : [];
+  const authors = authorNamesForSchema(recipe);
+  const yieldText = yieldString(recipe);
   const obj = {
     "@context": "https://schema.org",
     "@type": "Recipe",
@@ -93,6 +137,10 @@ function jsonLdRecipe(recipe, relativePath, canonicalUrl) {
       text,
     }));
   }
+  if (authors.length) {
+    obj.author = authors.map((a) => ({ "@type": "Person", name: a }));
+  }
+  if (yieldText) obj.recipeYield = yieldText;
   return JSON.stringify(obj);
 }
 
@@ -102,6 +150,14 @@ function noscriptArticle(recipe) {
   const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
   const steps = Array.isArray(recipe.steps) ? recipe.steps : [];
   let html = `<article><h1>${escapeHtml(name)}</h1>`;
+  const cul = recipeAuthorNames(recipe);
+  const pub = sourceAuthorNames(recipe);
+  if (cul.length) {
+    html += `<p><strong>By</strong> ${escapeHtml(cul.join(", "))}</p>`;
+  }
+  if (pub.length) {
+    html += `<p><strong>Credited in source:</strong> ${escapeHtml(pub.join(", "))}</p>`;
+  }
   if (ingredients.length) {
     html += "<h2>Ingredients</h2><ul>";
     for (const ing of ingredients) {

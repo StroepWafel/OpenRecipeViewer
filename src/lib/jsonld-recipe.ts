@@ -2,7 +2,7 @@ import type { RecordStr } from "./recipe-types";
 import {
   asIngredientArray,
   asStepArray,
-  asStringArray,
+  authorNamesForSchema,
   recipeName,
 } from "./recipe-types";
 import { siteOrigin } from "./library-api";
@@ -21,7 +21,7 @@ export function recipeJsonLd(
     .map((s) => (typeof s.step === "string" ? s.step : ""))
     .filter(Boolean);
 
-  const by = asStringArray(recipe.source_authors);
+  const authors = authorNamesForSchema(recipe);
   const yieldText = yieldString(recipe);
 
   const key = encodeRecipePath(relativePath);
@@ -42,7 +42,9 @@ export function recipeJsonLd(
       text,
     }));
   }
-  if (by.length) obj.author = by.map((a) => ({ "@type": "Person", name: a }));
+  if (authors.length) {
+    obj.author = authors.map((a) => ({ "@type": "Person", name: a }));
+  }
   if (yieldText) obj.recipeYield = yieldText;
 
   return JSON.stringify(obj);

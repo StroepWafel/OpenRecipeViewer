@@ -1,10 +1,14 @@
 import { Link } from "react-router-dom";
+import { LIBRARY_FROM_STATE } from "@/lib/library-nav";
 import { encodeRecipePath } from "@/lib/path-encoding";
 
 export function SimilarRecipes({
   items,
+  libraryFrom,
 }: {
   items: { path: string; name: string }[];
+  /** Same “back” target as the recipe header (meal list, home, etc.). */
+  libraryFrom: string;
 }) {
   if (items.length === 0) return null;
   return (
@@ -20,6 +24,7 @@ export function SimilarRecipes({
           <li key={path}>
             <Link
               to={`/r/${encodeRecipePath(path)}`}
+              state={{ [LIBRARY_FROM_STATE]: libraryFrom }}
               className="text-[var(--color-accent)] hover:underline font-medium"
             >
               {name}

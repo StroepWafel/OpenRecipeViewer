@@ -1,6 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
 import {
   Link,
+  useLocation,
   useParams,
   useSearchParams,
   useNavigate,
@@ -14,6 +22,7 @@ import {
   siteOrigin,
   type LibraryList,
 } from "@/lib/library-api";
+import { libraryBackFromState } from "@/lib/library-nav";
 import { decodeRecipePath, encodeRecipePath } from "@/lib/path-encoding";
 import { recipeJsonLd, recipeMetaDescription } from "@/lib/jsonld-recipe";
 import { similarRecipePaths } from "@/lib/similar-recipes";
@@ -21,10 +30,34 @@ import { recipeName } from "@/lib/recipe-types";
 import type { RecordStr } from "@/lib/recipe-types";
 import { parseBaseYieldAmount } from "@/lib/scale-yield";
 
+/** Scale relative to recipe base yield (same idea as common “servings” multipliers). */
+const YIELD_MULTIPLIERS = [
+  { label: "¼×", factor: 0.25 },
+  { label: "½×", factor: 0.5 },
+  { label: "1×", factor: 1 },
+  { label: "2×", factor: 2 },
+  { label: "3×", factor: 3 },
+  { label: "4×", factor: 4 },
+  { label: "8×", factor: 8 },
+] as const;
+
+function formatYieldForDisplay(n: number): string {
+  if (!Number.isFinite(n)) return "";
+  if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
+  const t = n.toFixed(4).replace(/\.?0+$/, "");
+  return t;
+}
+
 export function RecipePage() {
   const { recipeKey = "" } = useParams();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  const libraryBack = useMemo(
+    () => libraryBackFromState(location.state),
+    [location.state]
+  );
 
   const relativePath = useMemo(
     () => decodeRecipePath(recipeKey),
@@ -40,11 +73,27 @@ export function RecipePage() {
   const [error, setError] = useState<string | null>(null);
 
   const cook = searchParams.get("cook") === "1";
+  const cookRef = useRef(cook);
+  cookRef.current = cook;
 
   const servingsQ =
     searchParams.get("servings") ?? searchParams.get("yield") ?? "";
 
   const [targetAmount, setTargetAmount] = useState<number | null>(null);
+  const [yieldFocused, setYieldFocused] = useState(false);
+  const [yieldDraft, setYieldDraft] = useState("");
+  const [linkCopyFeedback, setLinkCopyFeedback] = useState<
+    "idle" | "copied" | "failed"
+  >("idle");
+  /** Increments on each successful copy so the flash animation can restart. */
+  const [copyBurst, setCopyBurst] = useState(0);
+  const linkCopyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (linkCopyResetRef.current) clearTimeout(linkCopyResetRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!relativePath) {
@@ -120,26 +169,60 @@ export function RecipePage() {
     [searchParams, setSearchParams, recipe, cook]
   );
 
-  const onTargetChange = (v: number) => {
-    setTargetAmount(v);
-    syncServingsUrl(v);
-  };
+  const commitTarget = useCallback(
+    (n: number) => {
+      setTargetAmount(n);
+      syncServingsUrl(n);
+    },
+    [syncServingsUrl]
+  );
 
+  /**
+   * Screen Wake Lock — keeps the display on while following the recipe (same idea as
+   * “cook mode” / prevent sleep in recipe plugins; see e.g.
+   * https://bootstrapped.ventures/cook-mode/ ). Re-acquire after tab becomes visible again.
+   */
   useEffect(() => {
     if (!cook) return;
+
     let lock: WakeLockSentinel | null = null;
-    const req = async () => {
+
+    const release = async () => {
+      if (lock) {
+        try {
+          await lock.release();
+        } catch {
+          /* already released */
+        }
+        lock = null;
+      }
+    };
+
+    const acquire = async () => {
+      await release();
+      if (!cookRef.current) return;
       try {
         if ("wakeLock" in navigator) {
           lock = await navigator.wakeLock.request("screen");
         }
       } catch {
-        /* optional */
+        /* denied or unsupported */
       }
     };
-    void req();
+
+    void acquire();
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible" && cookRef.current) {
+        void acquire();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
-      lock?.release().catch(() => {});
+      document.removeEventListener("visibilitychange", onVisibility);
+      void release();
     };
   }, [cook]);
 
@@ -178,9 +261,13 @@ export function RecipePage() {
   const origin = siteOrigin();
   const canonicalPath = `/r/${encodeRecipePath(relativePath)}`;
   const canonical = origin ? `${origin}${canonicalPath}` : canonicalPath;
+  const baseYieldAmount = parseBaseYieldAmount(
+    recipe.base_yield as RecordStr | undefined
+  );
   const target =
-    targetAmount ??
-    parseBaseYieldAmount(recipe.base_yield as RecordStr | undefined);
+    targetAmount !== null && Number.isFinite(targetAmount) && targetAmount > 0
+      ? targetAmount
+      : baseYieldAmount;
 
   const shareUrl = () => {
     const u = new URL(window.location.href);
@@ -188,10 +275,24 @@ export function RecipePage() {
   };
 
   const copyLink = async () => {
+    if (linkCopyResetRef.current) {
+      clearTimeout(linkCopyResetRef.current);
+      linkCopyResetRef.current = null;
+    }
     try {
       await navigator.clipboard.writeText(shareUrl());
+      setCopyBurst((n) => n + 1);
+      setLinkCopyFeedback("copied");
+      linkCopyResetRef.current = setTimeout(() => {
+        setLinkCopyFeedback("idle");
+        linkCopyResetRef.current = null;
+      }, 2500);
     } catch {
-      /* ignore */
+      setLinkCopyFeedback("failed");
+      linkCopyResetRef.current = setTimeout(() => {
+        setLinkCopyFeedback("idle");
+        linkCopyResetRef.current = null;
+      }, 4000);
     }
   };
 
@@ -204,6 +305,51 @@ export function RecipePage() {
       { replace: true }
     );
   };
+
+  const yieldInputValue = yieldFocused
+    ? yieldDraft
+    : formatYieldForDisplay(target);
+
+  const applyMultiplier = (factor: number) => {
+    setYieldFocused(false);
+    const next = baseYieldAmount * factor;
+    commitTarget(next);
+  };
+
+  const onYieldFocus = () => {
+    setYieldFocused(true);
+    setYieldDraft(formatYieldForDisplay(target));
+  };
+
+  const onYieldBlur = () => {
+    setYieldFocused(false);
+    const raw = yieldDraft.trim().replace(",", ".");
+    if (
+      raw === "" ||
+      raw === "-" ||
+      raw === "." ||
+      raw === "-." ||
+      raw === "-0"
+    ) {
+      commitTarget(baseYieldAmount);
+      return;
+    }
+    const v = parseFloat(raw);
+    if (!Number.isFinite(v) || v <= 0) {
+      commitTarget(baseYieldAmount);
+    } else {
+      commitTarget(v);
+    }
+  };
+
+  const onYieldChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setYieldDraft(e.target.value);
+  };
+
+  const baseYieldUnit =
+    typeof (recipe.base_yield as RecordStr | undefined)?.unit === "string"
+      ? String((recipe.base_yield as RecordStr).unit)
+      : "units";
 
   return (
     <>
@@ -220,65 +366,161 @@ export function RecipePage() {
 
       <div className="flex flex-wrap items-center gap-2 mb-6">
         <Link
-          to="/"
+          to={libraryBack}
           className="text-sm text-[var(--color-muted)] hover:text-[var(--color-accent)]"
         >
-          ← Library
+          {libraryBack === "/" ? "← Library" : "← Back"}
         </Link>
         <button
+          key={
+            linkCopyFeedback === "copied"
+              ? `recipe-copy-${copyBurst}`
+              : "recipe-copy-idle"
+          }
           type="button"
           onClick={copyLink}
-          className="text-sm px-3 py-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-paper)] hover:border-[var(--color-accent)]"
+          title={
+            linkCopyFeedback === "failed"
+              ? "Tap to try again"
+              : undefined
+          }
+          aria-label={
+            linkCopyFeedback === "copied"
+              ? "Link copied to clipboard"
+              : linkCopyFeedback === "failed"
+                ? "Copy failed — try again"
+                : "Copy recipe link to clipboard"
+          }
+          className={`inline-flex items-center justify-center text-sm leading-tight px-2 py-1 rounded-md border ${
+            linkCopyFeedback === "copied"
+              ? "recipe-copy-btn-flash border-[var(--color-border)] bg-[var(--color-paper)] text-[var(--color-ink)]"
+              : linkCopyFeedback === "failed"
+                ? "border-red-300 bg-red-50 text-red-900 transition-[color,background-color,border-color] duration-300 ease-out motion-reduce:duration-0"
+                : "border-[var(--color-border)] bg-[var(--color-paper)] text-[var(--color-ink)] hover:border-[var(--color-accent)] transition-[color,background-color,border-color] duration-300 ease-out motion-reduce:duration-0"
+          }`}
         >
-          Copy link
+          <span className="inline-grid grid-cols-1 grid-rows-1 justify-items-center">
+            <span
+              className={`col-start-1 row-start-1 whitespace-nowrap text-center transition-opacity duration-300 ease-out motion-reduce:transition-none ${
+                linkCopyFeedback === "idle"
+                  ? "opacity-100"
+                  : "pointer-events-none opacity-0"
+              }`}
+              aria-hidden={linkCopyFeedback !== "idle"}
+            >
+              Copy link
+            </span>
+            <span
+              className={`col-start-1 row-start-1 whitespace-nowrap text-center transition-opacity duration-300 ease-out motion-reduce:transition-none ${
+                linkCopyFeedback === "copied"
+                  ? "opacity-100"
+                  : "pointer-events-none opacity-0"
+              }`}
+              aria-hidden={linkCopyFeedback !== "copied"}
+            >
+              Copied!
+            </span>
+            <span
+              className={`col-start-1 row-start-1 whitespace-nowrap text-center transition-opacity duration-300 ease-out motion-reduce:transition-none ${
+                linkCopyFeedback === "failed"
+                  ? "opacity-100"
+                  : "pointer-events-none opacity-0"
+              }`}
+              aria-hidden={linkCopyFeedback !== "failed"}
+            >
+              Copy failed
+            </span>
+          </span>
         </button>
         <button
           type="button"
+          aria-pressed={cook}
+          title={
+            cook
+              ? "Screen stay-awake is on (Wake Lock). Tap to allow the screen to sleep."
+              : "Keep the screen on while you cook (uses the Wake Lock API where supported; requires a secure context)."
+          }
           onClick={toggleCook}
-          className={`text-sm px-3 py-1.5 rounded-md border ${
+          className={`inline-flex items-center justify-center text-sm leading-tight px-2 py-1 rounded-md border ${
             cook
               ? "bg-[var(--color-accent)] text-white border-[var(--color-accent)]"
               : "border-[var(--color-border)] bg-[var(--color-paper)] hover:border-[var(--color-accent)]"
           }`}
         >
-          Cooking mode
+          <span className="inline-grid grid-cols-1 grid-rows-1 justify-items-center">
+            <span
+              className={`col-start-1 row-start-1 whitespace-nowrap text-center transition-opacity duration-200 ease-out motion-reduce:transition-none ${
+                cook
+                  ? "pointer-events-none opacity-0"
+                  : "opacity-100"
+              }`}
+              aria-hidden={cook}
+            >
+              Keep screen on
+            </span>
+            <span
+              className={`col-start-1 row-start-1 whitespace-nowrap text-center transition-opacity duration-200 ease-out motion-reduce:transition-none ${
+                cook
+                  ? "opacity-100"
+                  : "pointer-events-none opacity-0"
+              }`}
+              aria-hidden={!cook}
+            >
+              Screen on
+            </span>
+          </span>
         </button>
       </div>
 
-      {!cook && (
-        <div className="mb-8 flex flex-wrap items-end gap-4 p-4 rounded-[var(--radius-card)] bg-[var(--color-paper)] border border-[var(--color-border)]">
-          <label className="flex flex-col gap-1 text-sm">
+      <div className="mb-8 flex flex-col gap-4 p-4 rounded-[var(--radius-card)] bg-[var(--color-paper)] border border-[var(--color-border)]">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1 text-sm min-w-0">
             <span className="text-[var(--color-muted)]">Target yield</span>
-            <span className="flex items-center gap-2">
+            <span className="flex items-center gap-2 flex-wrap">
               <input
-                type="number"
-                min={0.01}
-                step="any"
-                className="w-32 px-2 py-1.5 rounded-md border border-[var(--color-border)] bg-white"
-                value={Number.isFinite(target) ? target : ""}
-                onChange={(e) => {
-                  const v = parseFloat(e.target.value);
-                  if (Number.isFinite(v) && v > 0) onTargetChange(v);
-                }}
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                spellCheck={false}
+                aria-label="Target yield amount"
+                className="w-36 px-2 py-1.5 rounded-md border border-[var(--color-border)] bg-white font-mono tabular-nums"
+                value={yieldInputValue}
+                onFocus={onYieldFocus}
+                onBlur={onYieldBlur}
+                onChange={onYieldChange}
               />
-              <span className="text-[var(--color-muted)]">
-                {typeof (recipe.base_yield as RecordStr | undefined)?.unit ===
-                "string"
-                  ? String((recipe.base_yield as RecordStr).unit)
-                  : "units"}
-              </span>
+              <span className="text-[var(--color-muted)]">{baseYieldUnit}</span>
             </span>
           </label>
-          <p className="text-xs text-[var(--color-muted)] max-w-sm">
-            Ingredient amounts scale from the recipe&apos;s base yield. Share
-            this page with the &quot;servings&quot; query to preserve the scale.
-          </p>
         </div>
-      )}
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Yield scale shortcuts">
+          {YIELD_MULTIPLIERS.map(({ label, factor }) => (
+            <button
+              key={factor}
+              type="button"
+              onClick={() => applyMultiplier(factor)}
+              className="text-sm px-2.5 py-1.5 rounded-md border border-[var(--color-border)] bg-white hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)]"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-[var(--color-muted)] max-w-xl">
+          Amounts scale from the recipe&apos;s base yield ({baseYieldAmount}{" "}
+          {baseYieldUnit}). Shortcuts multiply that base. Share this page with a
+          &quot;servings&quot; query to keep your scale.
+        </p>
+      </div>
 
-      <RecipeBody recipe={recipe} cooking={cook} targetYieldAmount={target} />
+      <RecipeBody
+        key={relativePath}
+        recipe={recipe}
+        targetYieldAmount={target}
+      />
 
-      {!cook && index ? <SimilarRecipes items={similar} /> : null}
+      {index ? (
+        <SimilarRecipes items={similar} libraryFrom={libraryBack} />
+      ) : null}
     </>
   );
 }

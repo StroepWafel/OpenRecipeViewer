@@ -285,6 +285,7 @@ export function RecipePage() {
 
   const shareUrl = () => {
     const u = new URL(window.location.href);
+    u.searchParams.delete("cook");
     return u.toString();
   };
 

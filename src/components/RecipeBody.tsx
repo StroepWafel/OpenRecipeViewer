@@ -150,14 +150,14 @@ export function RecipeBody({
               return (
                 <li
                   key={i}
-                  className="flex gap-3 items-start border-l-2 border-[var(--color-accent)]/30 pl-3 -ml-px"
+                  className="recipe-ingredient-row flex gap-3 items-start border-l-2 border-[var(--color-accent)]/30 pl-3 -ml-px print:border-l-0 print:pl-0 print:gap-0"
                 >
                   <input
                     id={id}
                     type="checkbox"
                     checked={done}
                     onChange={() => toggleIngredient(i)}
-                    className="mt-1.5 h-4 w-4 shrink-0 rounded border-[var(--color-border)] accent-[var(--color-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+                    className="recipe-ingredient-checkbox mt-1.5 h-4 w-4 shrink-0 rounded border-[var(--color-border)] accent-[var(--color-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] print:hidden"
                     aria-label={`Mark ${ingLabel} as gathered`}
                   />
                   <label

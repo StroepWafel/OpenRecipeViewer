@@ -65,6 +65,55 @@ body {
   animation: recipe-copy-flash 1.75s ease-out forwards;
 }
 
+/* Recipe page: print / Save as PDF (browser print dialog) */
+@media print {
+  body.recipe-print-page {
+    background: #fff !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body.recipe-print-page header,
+  body.recipe-print-page footer {
+    display: none !important;
+  }
+
+  body.recipe-print-page main {
+    padding-top: 0 !important;
+    padding-bottom: 1rem !important;
+    max-width: none !important;
+  }
+
+  body.recipe-print-page .recipe-prose {
+    max-width: none !important;
+    font-size: 11pt;
+    line-height: 1.5;
+  }
+
+  body.recipe-print-page .recipe-prose h1 {
+    font-size: 20pt;
+    break-after: avoid;
+  }
+
+  body.recipe-print-page .recipe-prose h2 {
+    break-after: avoid;
+  }
+
+  body.recipe-print-page .recipe-prose section {
+    break-inside: avoid;
+  }
+
+  body.recipe-print-page .recipe-prose ol {
+    break-inside: auto;
+  }
+
+  body.recipe-print-page .recipe-prose a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

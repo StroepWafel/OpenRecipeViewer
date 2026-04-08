@@ -96,6 +96,12 @@ export function RecipePage() {
   }, []);
 
   useEffect(() => {
+    if (!recipe) return;
+    document.body.classList.add("recipe-print-page");
+    return () => document.body.classList.remove("recipe-print-page");
+  }, [recipe]);
+
+  useEffect(() => {
     if (!relativePath) {
       setError("Invalid recipe link.");
       setLoading(false);
@@ -364,7 +370,7 @@ export function RecipePage() {
         <script type="application/ld+json">{jsonLd}</script>
       </Helmet>
 
-      <div className="flex flex-wrap items-center gap-2 mb-6">
+      <div className="flex flex-wrap items-center gap-2 mb-6 print:hidden">
         <Link
           to={libraryBack}
           className="text-sm text-[var(--color-muted)] hover:text-[var(--color-accent)]"
@@ -434,6 +440,15 @@ export function RecipePage() {
         </button>
         <button
           type="button"
+          onClick={() => window.print()}
+          title="Opens the system print dialog. Choose Save as PDF (or Microsoft Print to PDF) as the printer to download a PDF."
+          aria-label="Print recipe or save as PDF"
+          className="inline-flex items-center justify-center text-sm leading-tight px-2 py-1 rounded-md border border-[var(--color-border)] bg-[var(--color-paper)] hover:border-[var(--color-accent)]"
+        >
+          Print / PDF
+        </button>
+        <button
+          type="button"
           aria-pressed={cook}
           title={
             cook
@@ -472,7 +487,7 @@ export function RecipePage() {
         </button>
       </div>
 
-      <div className="mb-8 flex flex-col gap-4 p-4 rounded-[var(--radius-card)] bg-[var(--color-paper)] border border-[var(--color-border)]">
+      <div className="mb-8 flex flex-col gap-4 p-4 rounded-[var(--radius-card)] bg-[var(--color-paper)] border border-[var(--color-border)] print:hidden">
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-sm min-w-0">
             <span className="text-[var(--color-muted)]">Target yield</span>
@@ -519,7 +534,9 @@ export function RecipePage() {
       />
 
       {index ? (
-        <SimilarRecipes items={similar} libraryFrom={libraryBack} />
+        <div className="print:hidden">
+          <SimilarRecipes items={similar} libraryFrom={libraryBack} />
+        </div>
       ) : null}
     </>
   );

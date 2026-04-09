@@ -1,5 +1,6 @@
 import { Link, Outlet } from "react-router-dom";
 import { libraryEnv } from "../lib/library-api";
+import { SearchBarNav } from "./SearchBarNav";
 
 export function Layout() {
   const { owner, repo } = libraryEnv();
@@ -15,21 +16,18 @@ export function Layout() {
           >
             Open Recipe Library
           </Link>
-          <div className="flex items-center gap-4 ml-auto">
-          <Link
-            to="/search"
-            className="text-sm text-[var(--color-muted)] hover:text-[var(--color-accent)]"
-          >
-            Search
-          </Link>
-          <a
-            href={repoWeb}
-            target="_blank"
-            rel="noreferrer"
-            className="text-sm text-[var(--color-muted)] hover:text-[var(--color-accent)]"
-          >
-            Source
-          </a>
+          <div className="flex items-center gap-3 ml-auto min-w-0 shrink">
+            <div className="min-w-0 w-[min(100%,14rem)] sm:w-56">
+              <SearchBarNav variant="header" urlSync />
+            </div>
+            <a
+              href={repoWeb}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm text-[var(--color-muted)] hover:text-[var(--color-accent)] shrink-0"
+            >
+              Source
+            </a>
           </div>
         </div>
       </header>

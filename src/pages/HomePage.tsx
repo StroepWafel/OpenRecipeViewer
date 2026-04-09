@@ -5,6 +5,7 @@ import { collectRecipePaths, siteOrigin, type LibraryList } from "@/lib/library-
 import { loadLibraryBundle } from "@/lib/library-static";
 import { ogImageAbsoluteUrl } from "@/lib/og";
 import { mealIndexEntries } from "@/lib/meal-routes";
+import { SearchBarNav } from "@/components/SearchBarNav";
 
 export function HomePage() {
   const [index, setIndex] = useState<LibraryList | null>(null);
@@ -62,6 +63,7 @@ export function HomePage() {
       </Helmet>
 
       <div className="max-w-2xl">
+        <SearchBarNav variant="hero" className="mb-8" />
         <h1 className="text-3xl font-semibold tracking-tight text-[var(--color-ink)] mb-2">
           Library
         </h1>

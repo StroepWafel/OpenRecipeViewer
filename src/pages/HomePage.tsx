@@ -1,12 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import {
-  collectRecipePaths,
-  fetchLibraryIndex,
-  siteOrigin,
-  type LibraryList,
-} from "@/lib/library-api";
+import { collectRecipePaths, siteOrigin, type LibraryList } from "@/lib/library-api";
+import { loadLibraryBundle } from "@/lib/library-static";
 import { ogImageAbsoluteUrl } from "@/lib/og";
 import { mealIndexEntries } from "@/lib/meal-routes";
 
@@ -19,9 +15,9 @@ export function HomePage() {
     let cancelled = false;
     (async () => {
       try {
-        const idx = await fetchLibraryIndex();
+        const bundle = await loadLibraryBundle();
         if (cancelled) return;
-        setIndex(idx);
+        setIndex(bundle.index);
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : String(e));

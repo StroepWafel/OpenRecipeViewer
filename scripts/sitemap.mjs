@@ -4,17 +4,21 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { normalizeSiteUrl } from "./load-env.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.join(__dirname, "..", "dist");
+const repoRoot = path.join(__dirname, "..");
 
-const owner = process.env.VITE_LIBRARY_OWNER ?? "stroepwafel";
-const repo = process.env.VITE_LIBRARY_REPO ?? "OpenRecipeLibrary";
-const ref = process.env.VITE_LIBRARY_REF ?? "library";
-let siteUrl = process.env.VITE_SITE_URL ?? "https://example.com";
-siteUrl = siteUrl.replace(/\/+$/, "");
+let siteUrl =
+  normalizeSiteUrl(process.env.VITE_SITE_URL ?? "") || "https://example.com";
 
-const rawBase = `https://raw.githubusercontent.com/${owner}/${repo}/${ref}`;
+const libraryBundlePath = path.join(
+  repoRoot,
+  "public",
+  "library-data",
+  "bundle.json"
+);
 
 function encodeRecipePath(relativePath) {
   return Buffer.from(relativePath, "utf8").toString("base64url");
@@ -42,23 +46,20 @@ function collectRecipePaths(index) {
   return Array.from(set).sort();
 }
 
-async function fetchJson(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-}
-
 async function main() {
   const urls = [`${siteUrl}/`];
 
-  try {
-    const index = await fetchJson(`${rawBase}/library-list.json`);
-    for (const p of collectRecipePaths(index)) {
-      const key = encodeRecipePath(p);
-      urls.push(`${siteUrl}/r/${key}`);
-    }
-  } catch (e) {
-    console.warn("sitemap: index fetch failed, home only:", e);
+  if (!fs.existsSync(libraryBundlePath)) {
+    console.error(
+      "sitemap: public/library-data/bundle.json missing; run `npm run sync` first."
+    );
+    process.exit(1);
+  }
+  const bundle = JSON.parse(fs.readFileSync(libraryBundlePath, "utf8"));
+  const index = bundle.index;
+  for (const p of collectRecipePaths(index)) {
+    const key = encodeRecipePath(p);
+    urls.push(`${siteUrl}/r/${key}`);
   }
 
   const lastmod = new Date().toISOString().slice(0, 10);

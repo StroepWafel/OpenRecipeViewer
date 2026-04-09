@@ -1,12 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import {
-  fetchLibraryIndex,
-  fetchRecipesBatched,
-  type LibraryList,
-  type FetchRecipeResult,
-} from "@/lib/library-api";
+import type { LibraryList } from "@/lib/library-api";
+import { loadLibraryBundle } from "@/lib/library-static";
 import {
   formatMealLabel,
   pathsForMealKey,
@@ -26,14 +22,13 @@ export function MealPage() {
   const [resolvedKey, setResolvedKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [failures, setFailures] = useState<string[]>([]);
-
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const idx = await fetchLibraryIndex();
+        const bundle = await loadLibraryBundle();
         if (cancelled) return;
+        const idx = bundle.index;
         setIndex(idx);
         const key = resolveMealSlug(idx, mealSlug);
         if (!key) {
@@ -48,16 +43,12 @@ export function MealPage() {
           setLoading(false);
           return;
         }
-        const results = await fetchRecipesBatched(paths, 8);
-        if (cancelled) return;
         const m = new Map<string, RecordStr>();
-        const bad: string[] = [];
-        for (const r of results as FetchRecipeResult[]) {
-          if (r.ok) m.set(r.path, r.recipe);
-          else bad.push(`${r.path}: ${r.error}`);
+        for (const p of paths) {
+          const rec = bundle.recipes[p];
+          if (rec) m.set(p, rec as RecordStr);
         }
         setByPath(m);
-        setFailures(bad);
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : String(e));
@@ -171,16 +162,6 @@ export function MealPage() {
               </li>
             ))}
           </ul>
-        )}
-        {failures.length > 0 && (
-          <details className="mt-6 text-sm text-[var(--color-muted)]">
-            <summary>Some recipes failed to load ({failures.length})</summary>
-            <ul className="mt-2 list-disc pl-5">
-              {failures.slice(0, 10).map((f) => (
-                <li key={f}>{f}</li>
-              ))}
-            </ul>
-          </details>
         )}
       </div>
     </>

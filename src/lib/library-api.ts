@@ -21,21 +21,6 @@ export function libraryEnv(): { owner: string; repo: string; ref: string } {
   };
 }
 
-export function rawBase(): string {
-  const { owner, repo, ref } = libraryEnv();
-  return `https://raw.githubusercontent.com/${owner}/${repo}/${ref}`;
-}
-
-export function libraryListUrl(): string {
-  return `${rawBase()}/library-list.json`;
-}
-
-export function recipeRawUrl(relativePath: string): string {
-  const base = rawBase();
-  const p = relativePath.replace(/^\/+/, "");
-  return `${base}/${p}`;
-}
-
 export function collectRecipePaths(index: LibraryList): string[] {
   const set = new Set<string>();
   const buckets = [
@@ -56,62 +41,6 @@ export function collectRecipePaths(index: LibraryList): string[] {
     }
   }
   return Array.from(set).sort();
-}
-
-export async function fetchLibraryIndex(): Promise<LibraryList> {
-  const res = await fetch(libraryListUrl(), { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Failed to load library index (${res.status})`);
-  }
-  return (await res.json()) as LibraryList;
-}
-
-export async function fetchRecipeJson(
-  relativePath: string
-): Promise<Record<string, unknown>> {
-  const res = await fetch(recipeRawUrl(relativePath), { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Failed to load recipe (${res.status})`);
-  }
-  return (await res.json()) as Record<string, unknown>;
-}
-
-/** Run async tasks with limited concurrency. */
-export async function runPool<T, R>(
-  items: T[],
-  concurrency: number,
-  fn: (item: T, index: number) => Promise<R>
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let i = 0;
-  async function worker(): Promise<void> {
-    while (i < items.length) {
-      const idx = i++;
-      results[idx] = await fn(items[idx]!, idx);
-    }
-  }
-  const n = Math.min(concurrency, Math.max(1, items.length));
-  await Promise.all(Array.from({ length: n }, () => worker()));
-  return results;
-}
-
-export type FetchRecipeResult =
-  | { ok: true; path: string; recipe: Record<string, unknown> }
-  | { ok: false; path: string; error: string };
-
-export async function fetchRecipesBatched(
-  paths: string[],
-  concurrency = 8
-): Promise<FetchRecipeResult[]> {
-  return runPool(paths, concurrency, async (path) => {
-    try {
-      const recipe = await fetchRecipeJson(path);
-      return { ok: true, path, recipe };
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return { ok: false, path, error: msg };
-    }
-  });
 }
 
 export function siteOrigin(): string {

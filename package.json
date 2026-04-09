@@ -4,14 +4,17 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "sync": "node scripts/sync-library.mjs",
+    "build-search-index": "node scripts/build-search-index.mjs",
     "dev": "vite",
-    "build": "tsc -b && vite build && node scripts/prerender.mjs && node scripts/sitemap.mjs",
+    "build": "node scripts/sync-library.mjs && node scripts/build-search-index.mjs && tsc -b && vite build && node scripts/prerender.mjs && node scripts/sitemap.mjs",
     "preview": "vite preview",
     "lint": "eslint ."
   },
   "dependencies": {
     "@fontsource/source-sans-3": "^5.2.5",
     "@resvg/resvg-js": "^2.6.2",
+    "minisearch": "^7.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-helmet-async": "^2.0.5",
@@ -25,6 +28,7 @@
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
+    "dotenv": "^17.4.1",
     "eslint": "^9.22.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",

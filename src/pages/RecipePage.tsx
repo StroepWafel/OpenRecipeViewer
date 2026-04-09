@@ -16,12 +16,8 @@ import {
 import { Helmet } from "react-helmet-async";
 import { RecipeBody } from "@/components/RecipeBody";
 import { SimilarRecipes } from "@/components/SimilarRecipes";
-import {
-  fetchLibraryIndex,
-  fetchRecipeJson,
-  siteOrigin,
-  type LibraryList,
-} from "@/lib/library-api";
+import { siteOrigin, type LibraryList } from "@/lib/library-api";
+import { catalogPathsSet, loadLibraryBundle } from "@/lib/library-static";
 import { libraryBackFromState } from "@/lib/library-nav";
 import { decodeRecipePath, encodeRecipePath } from "@/lib/path-encoding";
 import { recipeJsonLd, recipeMetaDescription } from "@/lib/jsonld-recipe";
@@ -111,26 +107,28 @@ export function RecipePage() {
     let cancelled = false;
     (async () => {
       try {
-        const [idx, rec] = await Promise.all([
-          fetchLibraryIndex(),
-          fetchRecipeJson(relativePath),
-        ]);
+        const bundle = await loadLibraryBundle();
         if (cancelled) return;
+        const idx = bundle.index;
+        const catalog = catalogPathsSet(idx);
+        if (!catalog.has(relativePath)) {
+          setError("Recipe not found in catalog.");
+          return;
+        }
+        const rec = bundle.recipes[relativePath];
+        if (!rec) {
+          setError("Recipe data missing from the bundle.");
+          return;
+        }
         setIndex(idx);
-        setRecipe(rec);
+        setRecipe(rec as RecordStr);
 
         const simPaths = similarRecipePaths(idx, relativePath, 5);
         const names: { path: string; name: string }[] = [];
-        await Promise.all(
-          simPaths.map(async (p) => {
-            try {
-              const r = await fetchRecipeJson(p);
-              names.push({ path: p, name: recipeName(r) });
-            } catch {
-              names.push({ path: p, name: p });
-            }
-          })
-        );
+        for (const p of simPaths) {
+          const r = bundle.recipes[p];
+          if (r) names.push({ path: p, name: recipeName(r as RecordStr) });
+        }
         if (!cancelled) setSimilar(names);
       } catch (e) {
         if (!cancelled) {

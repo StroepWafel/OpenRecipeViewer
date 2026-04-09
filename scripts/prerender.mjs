@@ -1,3 +1,5 @@
+import { normalizeSiteUrl } from "./load-env.mjs";
+
 /**
  * After `vite build`, generates `dist/r/<key>/index.html` for each recipe in library-list.json
  * with head tags, JSON-LD, and a noscript article for crawlers without JS.
@@ -12,10 +14,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.join(__dirname, "..", "dist");
 const repoRoot = path.join(__dirname, "..");
 
-const owner = process.env.VITE_LIBRARY_OWNER ?? "stroepwafel";
-const repo = process.env.VITE_LIBRARY_REPO ?? "OpenRecipeLibrary";
-const ref = process.env.VITE_LIBRARY_REF ?? "library";
-const siteUrl = (process.env.VITE_SITE_URL ?? "").replace(/\/+$/, "");
+const siteUrl = normalizeSiteUrl(process.env.VITE_SITE_URL ?? "");
 
 const ogImageVersion = JSON.parse(
   fs.readFileSync(
@@ -45,7 +44,12 @@ function homeCanonicalUrl() {
   return `${siteUrl}${p}/`;
 }
 
-const rawBase = `https://raw.githubusercontent.com/${owner}/${repo}/${ref}`;
+const libraryBundlePath = path.join(
+  repoRoot,
+  "public",
+  "library-data",
+  "bundle.json"
+);
 
 function encodeRecipePath(relativePath) {
   return Buffer.from(relativePath, "utf8").toString("base64url");
@@ -210,12 +214,6 @@ function noscriptArticle(recipe) {
   return `<noscript>${html}</noscript>`;
 }
 
-async function fetchJson(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
-  return res.json();
-}
-
 async function main() {
   const indexPath = path.join(dist, "index.html");
   if (!fs.existsSync(indexPath)) {
@@ -224,13 +222,15 @@ async function main() {
   }
   const shell = fs.readFileSync(indexPath, "utf8");
 
-  let index;
-  try {
-    index = await fetchJson(`${rawBase}/library-list.json`);
-  } catch (e) {
-    console.warn("prerender: could not fetch library index:", e);
-    process.exit(0);
+  if (!fs.existsSync(libraryBundlePath)) {
+    console.error(
+      "prerender: public/library-data/bundle.json missing; run `npm run sync` first."
+    );
+    process.exit(1);
   }
+  const bundle = JSON.parse(fs.readFileSync(libraryBundlePath, "utf8"));
+  const index = bundle.index;
+  const recipes = bundle.recipes;
 
   const paths = collectRecipePaths(index);
   if (paths.length === 0) {
@@ -251,10 +251,9 @@ async function main() {
   try {
     for (const rel of paths) {
       const key = encodeRecipePath(rel);
-      let recipe;
-      try {
-        recipe = await fetchJson(`${rawBase}/${rel.replace(/^\/+/, "")}`);
-      } catch {
+      const recipe = recipes[rel];
+      if (!recipe) {
+        console.warn(`prerender: skipping ${rel} (missing from bundle)`);
         continue;
       }
       const title =

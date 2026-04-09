@@ -8,21 +8,29 @@ export function Layout() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="border-b border-[var(--color-border)] bg-[var(--color-paper)]/90 backdrop-blur-sm sticky top-0 z-10">
-        <div className="mx-auto max-w-3xl px-4 py-4 flex items-center justify-between gap-4">
+        <div className="mx-auto max-w-3xl px-4 py-4 flex items-center justify-between gap-4 flex-wrap">
           <Link
             to="/"
             className="text-lg font-semibold text-[var(--color-ink)] hover:text-[var(--color-accent)] transition-colors"
           >
             Open Recipe Library
           </Link>
+          <div className="flex items-center gap-4 ml-auto">
+          <Link
+            to="/search"
+            className="text-sm text-[var(--color-muted)] hover:text-[var(--color-accent)]"
+          >
+            Search
+          </Link>
           <a
-            href="https://github.com/stroepwafel/OpenRecipeLibrary"
+            href={repoWeb}
             target="_blank"
             rel="noreferrer"
             className="text-sm text-[var(--color-muted)] hover:text-[var(--color-accent)]"
           >
             Source
           </a>
+          </div>
         </div>
       </header>
       <main className="flex-1 mx-auto w-full max-w-3xl px-4 py-8">

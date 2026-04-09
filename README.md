@@ -1,6 +1,6 @@
 # Open Recipe Viewer
 
-A read-only web app for browsing recipes from the public [OpenRecipeLibrary](https://github.com/stroepwafel/OpenRecipeLibrary) catalog (Open Recipe Standard JSON). It loads the published `library` branch index and recipe files from GitHub, with shareable recipe URLs, optional yield scaling, cooking mode (screen wake lock), print-to-PDF via the browser, and lightweight SEO (prerendered recipe HTML and JSON-LD at build time).
+A read-only web app for browsing recipes from the public [OpenRecipeLibrary](https://github.com/stroepwafel/OpenRecipeLibrary) catalog (Open Recipe Standard JSON). At **build time** the app downloads the published `library` branch index and every recipe file from GitHub and writes `public/library-data/bundle.json` (gitignored). The browser only loads that same-origin JSON bundle—there is no runtime fetch to GitHub. The site includes shareable recipe URLs, optional yield scaling, cooking mode (screen wake lock), print-to-PDF via the browser, and SEO-oriented prerendered recipe HTML and JSON-LD at build time.
 
 ## Requirements
 
@@ -11,32 +11,39 @@ A read-only web app for browsing recipes from the public [OpenRecipeLibrary](htt
 
 ```bash
 npm install
+npm run sync
+npm run build-search-index
 npm run dev
 ```
 
-Open the URL shown in the terminal (usually `http://localhost:5173`).
+`npm run sync` downloads the library into `public/library-data/bundle.json`. `npm run build-search-index` builds the MiniSearch index at `public/library-data/search-index.json` (required for **Search** in the header). For local dev you can run `npm run build` once instead, or rely on `npm run build` in CI (sync + search index + bundle). Open the URL shown in the terminal (usually `http://localhost:5173`).
 
 ## Scripts
 
 | Command        | Description |
 |----------------|-------------|
-| `npm run dev`  | Start Vite dev server with hot reload |
-| `npm run build`| Typecheck, production bundle, prerender recipe HTML, generate `sitemap.xml` |
+| `npm run sync` | Download `library-list.json` and all recipes into `public/library-data/bundle.json` |
+| `npm run build-search-index` | Build `public/library-data/search-index.json` from the bundle (MiniSearch; run after `sync`) |
+| `npm run dev`  | Start Vite dev server with hot reload (run `sync` and `build-search-index` first for search) |
+| `npm run build`| Sync, search index, typecheck, production bundle, prerender recipe HTML, generate `sitemap.xml` |
 | `npm run preview` | Serve the `dist/` output locally |
 | `npm run lint` | Run ESLint |
 
 ## How data is loaded
 
-Recipes are not bundled into this repo. At runtime the app fetches:
+`npm run sync` (also the first step of `npm run build`) reads from raw GitHub:
 
-- `library-list.json` — catalog and groupings (including `by_meal_type`)
-- Individual recipe JSON files — paths listed in that index
+`https://raw.githubusercontent.com/<owner>/<repo>/<ref>/`
 
-Default source is raw GitHub content:
+It writes **`public/library-data/bundle.json`**, containing the full `library-list.json` index and every recipe JSON keyed by library-relative path. The next step, **`npm run build-search-index`** (included in `npm run build`), reads that bundle and writes **`public/library-data/search-index.json`**, a serialized [MiniSearch](https://github.com/lucaong/minisearch) index for typo-tolerant full-text search over titles, ingredients, tags, and text. Both files are **gitignored** under `public/library-data/` and copied into `dist/`. The SPA loads them from the same origin; unknown recipe URLs show an error—there is no fallback fetch to GitHub.
 
-`https://raw.githubusercontent.com/stroepwafel/OpenRecipeLibrary/library/`
+Point at another fork or branch with the `VITE_LIBRARY_*` variables below (used by the sync script and by client-side links such as the footer).
 
-You can point at another fork or branch with environment variables (see below).
+### Build authentication (optional)
+
+For **private** repositories, or if your host passes an auth header through to `raw.githubusercontent.com`, set **`GITHUB_TOKEN`**, **`GH_TOKEN`**, or **`GITHUB_PAT`** in the **build** environment (for example Cloudflare Pages → Settings → Environment variables → **Build**). The sync script sends it as `Authorization: Bearer …` on download requests.
+
+Unauthenticated requests to **`api.github.com`** are limited to **60/hour**; a personal access token with read access to the repo raises the **REST API** limit to **5,000/hour**. This project’s sync uses **raw** URLs by default (not the REST API), so that quota usually does not apply; the token still matters for private repos on raw fetches.
 
 ## Environment variables
 
@@ -47,16 +54,19 @@ All client-side variables use the `VITE_` prefix so they are embedded at build t
 | `VITE_LIBRARY_OWNER` | GitHub org or user (default: `stroepwafel`) |
 | `VITE_LIBRARY_REPO` | Repository name (default: `OpenRecipeLibrary`) |
 | `VITE_LIBRARY_REF` | Branch or tag (default: `library`) |
-| `VITE_SITE_URL` | Canonical site origin, no trailing slash (e.g. `https://example.com`). Used for JSON-LD, canonical URLs, and prerender. Falls back to `window.location.origin` in the browser when unset. |
+| `VITE_SITE_URL` | Canonical site origin, no trailing slash (e.g. `https://food-for-eating.com` or `food-for-eating.com` — `https://` is added automatically in Node build scripts if missing). Used for JSON-LD, canonical URLs, prerender, and `sitemap.xml`. Falls back to `window.location.origin` in the browser when unset. |
 | `VITE_BASE_PATH` | Subpath when not hosted at domain root (e.g. `/viewer/`). Must match how the app is deployed. |
 
-Create a `.env` or `.env.local` in the project root for local development. Set the same values in your hosting provider’s build environment for production.
+Create a `.env` or `.env.local` in the project root for local development. Set the same `VITE_*` values in your hosting provider’s build environment for production. Add **`GITHUB_TOKEN`** (or **`GH_TOKEN`**) to the build environment if you need authenticated downloads; do **not** prefix it with `VITE_` (it must not be exposed to the browser).
+
+**Note:** Vite loads `.env` files for `vite build`, but **`node scripts/sync-library.mjs`**, **`prerender.mjs`**, and **`sitemap.mjs`** run outside Vite. They load the same files via **`dotenv`** in [`scripts/load-env.mjs`](scripts/load-env.mjs), so `VITE_SITE_URL` applies to the sitemap and prerender when you run `npm run build` locally.
 
 ## Routes
 
 | Path | Description |
 |------|-------------|
 | `/` | Library home — meal-type sections |
+| `/search` | Full-text search (`?q=` query optional) |
 | `/m/:mealSlug` | Recipes for one meal type (slug derived from the index) |
 | `/r/:recipeKey` | Single recipe (`recipeKey` is a base64url-encoded library-relative path) |
 | `/c/:slug` | Legacy redirect to `/m/:slug` |
@@ -75,7 +85,8 @@ Set the document `$id` / hosting URL to match where you deploy that file.
 
 `npm run build` writes to `dist/` and:
 
-- Emits prerendered HTML under `dist/r/<key>/index.html` for each recipe path in `library-list.json` (requires network access during build to read the index and recipe JSON unless you rely on cached fetch behavior in your environment).
+- Runs **`sync`** (network) to refresh `public/library-data/bundle.json`, then **`build-search-index`** to write `search-index.json`, then prerender and sitemap read **only** those local files—no network in `prerender.mjs` / `sitemap.mjs`.
+- Emits prerendered HTML under `dist/r/<key>/index.html` for each recipe in the bundle.
 - Writes `dist/sitemap.xml` and `dist/robots.txt` as generated by the scripts in `scripts/`.
 
 Serve `dist/` as a static site. Client routes such as `/m/:mealSlug` must fall back to `index.html` when there is no matching file.
@@ -89,7 +100,7 @@ Typical flow: push to your Git host, then let the platform build from the repo.
    - **Build command:** `npm run build`
    - **Build output directory:** `dist`
    - **Root directory:** `/` (repo root), unless this app lives in a monorepo subfolder.
-3. **Environment variables** — add the same `VITE_*` values you use locally (Production, and Preview if you want previews to match).
+3. **Environment variables** — add the same `VITE_*` values you use locally (Production, and Preview if you want previews to match). Add **`GITHUB_TOKEN`** (or **`GH_TOKEN`**) under **Build** variables if the sync step needs authenticated access to the library repo.
 4. **SPA routing** — on [Cloudflare Pages](https://developers.cloudflare.com/pages/configuration/serving-pages/#single-page-application-spa-rendering), if there is **no** top-level `404.html` in the build output, Pages treats the site as an SPA and serves the app shell for unknown paths (so you usually do **not** need `_redirects` or `wrangler.toml` for Git deploys). Avoid adding a root `404.html` unless you intentionally want classic 404 behavior instead.
 
 `wrangler.toml` in this repo is optional for Git-based Pages deploys; it matters if you deploy with **`wrangler deploy`** (Workers + assets) from CI or your machine.

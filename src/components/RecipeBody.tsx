@@ -129,41 +129,89 @@ export function RecipeBody({
             ) : null}
           </p>
         )}
-        {hasOvenBlock ? (
-          <div className="space-y-1 pt-1 border-t border-[var(--color-border)]/60">
-            <p className="font-medium text-[var(--color-ink)]">Oven</p>
-            {ovenRequired !== null ? (
-              <p>
-                {ovenRequired ? "Oven required" : "Oven not required"}
-              </p>
-            ) : null}
-            {ovenFan ? (
-              <p>
-                <span className="font-medium text-[var(--color-ink)]">
-                  Convection:{" "}
-                </span>
-                {ovenFan}
-              </p>
-            ) : null}
-            {ovenTemp ? (
-              <p>
-                <span className="font-medium text-[var(--color-ink)]">
-                  Temperature:{" "}
-                </span>
-                {formatMeasurement(ovenTemp)}
-              </p>
-            ) : null}
-            {ovenTime ? (
-              <p>
-                <span className="font-medium text-[var(--color-ink)]">
-                  Oven time:{" "}
-                </span>
-                {formatMeasurement(ovenTime)}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
       </section>
+
+      {hasOvenBlock ? (
+        <section
+          className="mb-8 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-gradient-to-br from-[var(--color-paper)] to-[var(--color-accent-soft)]/40 p-4 shadow-sm"
+          aria-label="Oven"
+        >
+          <div className="flex gap-3">
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
+              aria-hidden
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="4" y="3" width="16" height="16" rx="2" />
+                <path d="M4 11h16" />
+                <path d="M9 7h6" />
+                <circle cx="9" cy="15" r="1" fill="currentColor" stroke="none" />
+                <circle cx="15" cy="15" r="1" fill="currentColor" stroke="none" />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1 space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-base font-semibold text-[var(--color-ink)] tracking-tight">
+                  Oven
+                </h2>
+                {ovenRequired !== null ? (
+                  <span
+                    className={
+                      ovenRequired
+                        ? "inline-flex items-center rounded-full border border-teal-200/80 bg-[var(--color-accent-soft)] px-2.5 py-0.5 text-xs font-medium text-[var(--color-accent)]"
+                        : "inline-flex items-center rounded-full border border-[var(--color-border)] bg-[var(--color-canvas)]/80 px-2.5 py-0.5 text-xs font-medium text-[var(--color-muted)]"
+                    }
+                  >
+                    {ovenRequired ? "Required" : "Not required"}
+                  </span>
+                ) : null}
+              </div>
+              {(ovenFan || ovenTemp || ovenTime) ? (
+                <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+                  {ovenFan ? (
+                    <div className="space-y-0.5">
+                      <dt className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                        Convection
+                      </dt>
+                      <dd className="text-[var(--color-ink)]">{ovenFan}</dd>
+                    </div>
+                  ) : null}
+                  {ovenTemp ? (
+                    <div className="space-y-0.5">
+                      <dt className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                        Temperature
+                      </dt>
+                      <dd className="font-medium tabular-nums text-[var(--color-ink)]">
+                        {formatMeasurement(ovenTemp)}
+                      </dd>
+                    </div>
+                  ) : null}
+                  {ovenTime ? (
+                    <div className="space-y-0.5 sm:col-span-2">
+                      <dt className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                        In the oven
+                      </dt>
+                      <dd className="text-[var(--color-ink)]">
+                        {formatMeasurement(ovenTime)}
+                      </dd>
+                    </div>
+                  ) : null}
+                </dl>
+              ) : null}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {notes.length > 0 ? (
         <section className="mb-8 p-4 rounded-[var(--radius-card)] bg-amber-50/80 border border-amber-100 text-[var(--color-ink)]">

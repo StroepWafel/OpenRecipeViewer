@@ -194,6 +194,12 @@ function noscriptArticle(recipe) {
   if (pub.length) {
     html += `<p><strong>Credited in source:</strong> ${escapeHtml(pub.join(", "))}</p>`;
   }
+  if (typeof recipe.oven_required === "boolean") {
+    html += `<p><strong>Oven</strong>: ${recipe.oven_required ? "Required" : "Not required"}</p>`;
+  }
+  if (typeof recipe.oven_fan === "string" && recipe.oven_fan.trim()) {
+    html += `<p><strong>Convection</strong>: ${escapeHtml(recipe.oven_fan.trim())}</p>`;
+  }
   if (ingredients.length) {
     html += "<h2>Ingredients</h2><ul>";
     for (const ing of ingredients) {

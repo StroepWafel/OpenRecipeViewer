@@ -38,6 +38,15 @@ export function RecipeBody({
   const cookT = asMeasurement(recipe.cook_time);
   const total = asMeasurement(recipe.total_time);
 
+  const ovenRequired =
+    typeof recipe.oven_required === "boolean" ? recipe.oven_required : null;
+  const ovenFan =
+    typeof recipe.oven_fan === "string" ? recipe.oven_fan.trim() : "";
+  const ovenTemp = asMeasurement(recipe.oven_temp);
+  const ovenTime = asMeasurement(recipe.oven_time);
+  const hasOvenBlock =
+    ovenRequired !== null || ovenFan || ovenTemp || ovenTime;
+
   const notes = asStringArray(recipe.notes);
   const ingredients = asIngredientArray(recipe.ingredients);
   const steps = asStepArray(recipe.steps);
@@ -120,6 +129,40 @@ export function RecipeBody({
             ) : null}
           </p>
         )}
+        {hasOvenBlock ? (
+          <div className="space-y-1 pt-1 border-t border-[var(--color-border)]/60">
+            <p className="font-medium text-[var(--color-ink)]">Oven</p>
+            {ovenRequired !== null ? (
+              <p>
+                {ovenRequired ? "Oven required" : "Oven not required"}
+              </p>
+            ) : null}
+            {ovenFan ? (
+              <p>
+                <span className="font-medium text-[var(--color-ink)]">
+                  Convection:{" "}
+                </span>
+                {ovenFan}
+              </p>
+            ) : null}
+            {ovenTemp ? (
+              <p>
+                <span className="font-medium text-[var(--color-ink)]">
+                  Temperature:{" "}
+                </span>
+                {formatMeasurement(ovenTemp)}
+              </p>
+            ) : null}
+            {ovenTime ? (
+              <p>
+                <span className="font-medium text-[var(--color-ink)]">
+                  Oven time:{" "}
+                </span>
+                {formatMeasurement(ovenTime)}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
       {notes.length > 0 ? (

@@ -203,9 +203,6 @@ export function SearchPage() {
                 className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-paper)] py-3 pl-11 pr-4 text-[var(--color-ink)] placeholder:text-[var(--color-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/40"
               />
             </div>
-            <p className="mt-2 text-xs text-[var(--color-muted)]">
-              Results update as you type ({DEBOUNCE_MS} ms after you pause).
-            </p>
           </div>
 
           <div className="p-4 sm:p-5">

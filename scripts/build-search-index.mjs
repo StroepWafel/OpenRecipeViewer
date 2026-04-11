@@ -50,6 +50,49 @@ function recipeToDoc(pathKey, recipe) {
   }
   const tags = tagParts.join(" ");
 
+  const corParts = [];
+  if (Array.isArray(recipe.cor)) {
+    for (const x of recipe.cor) {
+      if (typeof x === "string" && x.trim()) corParts.push(x.trim());
+    }
+  }
+  const corDisplay = corParts.join(", ");
+
+  const tagsPreviewArr = [];
+  if (Array.isArray(recipe.tags)) {
+    for (const x of recipe.tags) {
+      if (typeof x === "string" && x.trim()) {
+        tagsPreviewArr.push(x.trim());
+        if (tagsPreviewArr.length >= 5) break;
+      }
+    }
+  }
+  const tagsPreview = tagsPreviewArr.join("\u0001");
+
+  const allergenParts = [];
+  if (Array.isArray(recipe.allergens)) {
+    for (const x of recipe.allergens) {
+      if (typeof x === "string" && x.trim()) allergenParts.push(x.trim());
+    }
+  }
+  const allergensDisplay = allergenParts.join(", ");
+
+  const dietaryParts = [];
+  if (Array.isArray(recipe.dietary)) {
+    for (const x of recipe.dietary) {
+      if (typeof x === "string" && x.trim()) dietaryParts.push(x.trim());
+    }
+  }
+  const dietaryDisplay = dietaryParts.join(", ");
+
+  const skillRaw =
+    typeof recipe.skill_level === "string" ? recipe.skill_level.trim() : "";
+  const sl = skillRaw.toLowerCase();
+  let skillRank = 0;
+  if (sl === "beginner") skillRank = 1;
+  else if (sl === "intermediate") skillRank = 2;
+  else if (sl === "advanced") skillRank = 3;
+
   const noteTexts = [];
   if (Array.isArray(recipe.notes)) {
     for (const n of recipe.notes) {
@@ -86,6 +129,11 @@ function recipeToDoc(pathKey, recipe) {
     title,
     ingredients,
     tags,
+    corDisplay,
+    tagsPreview,
+    allergensDisplay,
+    dietaryDisplay,
+    skillRank,
     text,
     path: pathKey,
   };
@@ -114,7 +162,15 @@ function main() {
   const miniSearch = new MiniSearch({
     idField: "id",
     fields: ["title", "ingredients", "tags", "text"],
-    storeFields: ["title", "path"],
+    storeFields: [
+      "title",
+      "path",
+      "skillRank",
+      "corDisplay",
+      "tagsPreview",
+      "allergensDisplay",
+      "dietaryDisplay",
+    ],
     searchOptions: {
       boost: { title: 3, ingredients: 2, tags: 1.5, text: 1 },
       fuzzy: 0.2,

@@ -14,6 +14,54 @@ export function recipeName(recipe: RecordStr): string {
   return typeof n === "string" && n.trim() ? n.trim() : "Untitled recipe";
 }
 
+/** Country of recipe (COR): `cor` field, comma-separated for display. */
+export function recipeCorDisplay(recipe: RecordStr): string {
+  const v = recipe.cor;
+  if (!Array.isArray(v)) return "";
+  const parts: string[] = [];
+  for (const x of v) {
+    if (typeof x === "string" && x.trim()) parts.push(x.trim());
+  }
+  return parts.join(", ");
+}
+
+/** First `n` entries from `tags` only (not categories, cuisine, etc.). */
+export function recipeTagsFirstN(recipe: RecordStr, n: number): string[] {
+  const v = recipe.tags;
+  if (!Array.isArray(v)) return [];
+  const out: string[] = [];
+  for (const x of v) {
+    if (typeof x === "string" && x.trim()) {
+      out.push(x.trim());
+      if (out.length >= n) break;
+    }
+  }
+  return out;
+}
+
+function stringArrayFieldJoined(
+  recipe: RecordStr,
+  key: "allergens" | "dietary"
+): string {
+  const v = recipe[key];
+  if (!Array.isArray(v)) return "";
+  const parts: string[] = [];
+  for (const x of v) {
+    if (typeof x === "string" && x.trim()) parts.push(x.trim());
+  }
+  return parts.join(", ");
+}
+
+/** `allergens` field, comma-separated for display. */
+export function recipeAllergensDisplay(recipe: RecordStr): string {
+  return stringArrayFieldJoined(recipe, "allergens");
+}
+
+/** `dietary` field, comma-separated for display. */
+export function recipeDietaryDisplay(recipe: RecordStr): string {
+  return stringArrayFieldJoined(recipe, "dietary");
+}
+
 /** Culinary author(s) credited with creating or writing the recipe (`recipe_authors`). */
 export function recipeAuthorNames(recipe: RecordStr): string[] {
   const v = recipe.recipe_authors;

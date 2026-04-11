@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import type { LibraryList } from "@/lib/library-api";
+import { DifficultySortBar } from "@/components/DifficultySortBar";
+import {
+  RecipeListCardMeta,
+  RecipeListCardViewAction,
+} from "@/components/RecipeListCardMeta";
 import { loadLibraryBundle } from "@/lib/library-static";
 import {
   formatMealLabel,
@@ -10,12 +15,35 @@ import {
 } from "@/lib/meal-routes";
 import { LIBRARY_FROM_STATE } from "@/lib/library-nav";
 import { encodeRecipePath } from "@/lib/path-encoding";
-import { recipeName } from "@/lib/recipe-types";
+import {
+  compareSkillRank,
+  skillRankFromRecipe,
+} from "@/lib/recipe-tags";
+import {
+  recipeAllergensDisplay,
+  recipeCorDisplay,
+  recipeDietaryDisplay,
+  recipeName,
+  recipeTagsFirstN,
+} from "@/lib/recipe-types";
 import type { RecordStr } from "@/lib/recipe-types";
+
+function parseDifficultySort(params: URLSearchParams): "asc" | "desc" | null {
+  const d = params.get("diff");
+  if (d === "asc" || d === "desc") return d;
+  return null;
+}
 
 export function MealPage() {
   const { mealSlug = "" } = useParams();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const listBackTarget = `${pathname}${search}`;
+
+  const difficultySort = useMemo(
+    () => parseDifficultySort(searchParams),
+    [searchParams]
+  );
 
   const [index, setIndex] = useState<LibraryList | null>(null);
   const [byPath, setByPath] = useState<Map<string, RecordStr>>(new Map());
@@ -65,23 +93,82 @@ export function MealPage() {
   const label =
     resolvedKey !== null ? formatMealLabel(resolvedKey) : "Meal type";
 
+  const totalCount =
+    index && resolvedKey !== null
+      ? pathsForMealKey(index, resolvedKey).length
+      : 0;
+
   const items = useMemo(() => {
     if (!index || resolvedKey === null) return [];
     const paths = pathsForMealKey(index, resolvedKey);
     const rows = paths.map((p) => {
       const r = byPath.get(p);
-      return { path: p, title: r ? recipeName(r) : p };
+      const title = r ? recipeName(r) : p;
+      const skillRank = r ? skillRankFromRecipe(r) : 0;
+      const corDisplay = r ? recipeCorDisplay(r) : "";
+      const recipeTags = r ? recipeTagsFirstN(r, 5) : [];
+      const allergensDisplay = r ? recipeAllergensDisplay(r) : "";
+      const dietaryDisplay = r ? recipeDietaryDisplay(r) : "";
+      return {
+        path: p,
+        title,
+        skillRank,
+        corDisplay,
+        recipeTags,
+        allergensDisplay,
+        dietaryDisplay,
+      };
     });
-    rows.sort((a, b) =>
-      a.title.localeCompare(b.title, undefined, { sensitivity: "base" })
-    );
+    rows.sort((a, b) => {
+      if (difficultySort) {
+        const c = compareSkillRank(a.skillRank, b.skillRank, difficultySort);
+        if (c !== 0) return c;
+      }
+      return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+    });
     return rows;
-  }, [index, resolvedKey, byPath]);
+  }, [index, resolvedKey, byPath, difficultySort]);
 
-  const count =
+  function clearDifficultySort() {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("diff");
+        return next;
+      },
+      { replace: true }
+    );
+  }
+
+  function setDifficultyEnabled(on: boolean) {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (!on) next.delete("diff");
+        else if (!next.get("diff")) next.set("diff", "asc");
+        return next;
+      },
+      { replace: true }
+    );
+  }
+
+  function flipDifficultyDir() {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        const d = next.get("diff");
+        if (d === "desc") next.set("diff", "asc");
+        else next.set("diff", "desc");
+        return next;
+      },
+      { replace: true }
+    );
+  }
+
+  const countLine =
     index && resolvedKey !== null
-      ? pathsForMealKey(index, resolvedKey).length
-      : 0;
+      ? `${totalCount} recipe(s) · Index ${index.generated_at}`
+      : null;
 
   return (
     <>
@@ -107,11 +194,19 @@ export function MealPage() {
         <h1 className="text-3xl font-semibold tracking-tight text-[var(--color-ink)] mb-2">
           {label}
         </h1>
-        <p className="text-[var(--color-muted)] mb-8">
-          {index && resolvedKey !== null
-            ? `${count} recipe(s) · Index ${index.generated_at}`
-            : null}
-        </p>
+        <p className="text-[var(--color-muted)] mb-5">{countLine}</p>
+
+        <div className="mb-8 rounded-xl border border-[var(--color-border)] bg-[var(--color-paper)] p-4 shadow-sm sm:p-5">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+            List order
+          </p>
+          <DifficultySortBar
+            difficultySort={difficultySort}
+            onToggleEnabled={setDifficultyEnabled}
+            onFlipDirection={flipDifficultyDir}
+            onClear={clearDifficultySort}
+          />
+        </div>
 
         {loading && (
           <p className="text-[var(--color-muted)]" role="status">
@@ -144,20 +239,35 @@ export function MealPage() {
         )}
         {!loading && resolvedKey !== null && items.length > 0 && (
           <ul className="space-y-3 list-none p-0">
-            {items.map(({ path: p, title }) => (
+            {items.map(
+              ({
+                path: p,
+                title,
+                corDisplay,
+                recipeTags,
+                allergensDisplay,
+                dietaryDisplay,
+              }) => (
               <li
                 key={p}
                 className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-paper)] shadow-sm hover:border-[var(--color-accent)]/40 transition-colors"
               >
                 <Link
                   to={`/r/${encodeRecipePath(p)}`}
-                  state={{ [LIBRARY_FROM_STATE]: pathname }}
-                  className="block px-4 py-3 text-[var(--color-ink)] font-medium hover:text-[var(--color-accent)]"
+                  state={{ [LIBRARY_FROM_STATE]: listBackTarget }}
+                  className="group block px-4 py-3 text-[var(--color-ink)] font-medium hover:text-[var(--color-accent)]"
                 >
                   {title}
                   <span className="block text-xs font-normal text-[var(--color-muted)] mt-1 truncate">
                     {p}
                   </span>
+                  <RecipeListCardMeta
+                    corDisplay={corDisplay}
+                    recipeTags={recipeTags}
+                    allergensDisplay={allergensDisplay}
+                    dietaryDisplay={dietaryDisplay}
+                  />
+                  <RecipeListCardViewAction />
                 </Link>
               </li>
             ))}

@@ -90,12 +90,38 @@ export function asMeasurement(v: unknown): RecordStr | undefined {
   return v as RecordStr;
 }
 
-export function asIngredientArray(v: unknown): RecordStr[] {
+/** Object arrays (`ingredients`, `steps`, `substitutions`, etc.). */
+export function asRecordStrArray(v: unknown): RecordStr[] {
   if (!Array.isArray(v)) return [];
   return v.filter((x) => x && typeof x === "object" && !Array.isArray(x)) as RecordStr[];
 }
 
+export function asIngredientArray(v: unknown): RecordStr[] {
+  return asRecordStrArray(v);
+}
+
 export function asStepArray(v: unknown): RecordStr[] {
+  return asRecordStrArray(v);
+}
+
+/** `notes` on ingredients, steps, and recipe (`NotesList` in schema). */
+export function asNotesArray(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
-  return v.filter((x) => x && typeof x === "object" && !Array.isArray(x)) as RecordStr[];
+  const out: string[] = [];
+  for (const x of v) {
+    if (typeof x === "string" && x.trim()) out.push(x.trim());
+  }
+  return out;
+}
+
+/** Optional HACCP annotation on a step. */
+export function stepHaccpLabel(h: unknown): string | null {
+  if (!h || typeof h !== "object" || Array.isArray(h)) return null;
+  const o = h as RecordStr;
+  const cp = o.control_point;
+  if (typeof cp === "string" && cp.trim()) return `Control point: ${cp.trim()}`;
+  const ccp = o.critical_control_point;
+  if (typeof ccp === "string" && ccp.trim())
+    return `Critical control point: ${ccp.trim()}`;
+  return null;
 }

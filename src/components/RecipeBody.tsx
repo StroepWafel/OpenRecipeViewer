@@ -4,12 +4,15 @@ import type { RecordStr } from "@/lib/recipe-types";
 import {
   asIngredientArray,
   asMeasurement,
+  asNotesArray,
+  asRecordStrArray,
   asStepArray,
   asString,
   asStringArray,
   recipeAuthorNames,
   recipeName,
   sourceAuthorNames,
+  stepHaccpLabel,
 } from "@/lib/recipe-types";
 import { scaleFactorFromBaseYield, formatScaledIngredientLine } from "@/lib/scale-yield";
 
@@ -44,8 +47,10 @@ export function RecipeBody({
     typeof recipe.oven_fan === "string" ? recipe.oven_fan.trim() : "";
   const ovenTemp = asMeasurement(recipe.oven_temp);
   const ovenTime = asMeasurement(recipe.oven_time);
+  /** Omit the oven card entirely when the author marked oven as not required. */
   const hasOvenBlock =
-    ovenRequired !== null || ovenFan || ovenTemp || ovenTime;
+    ovenRequired !== false &&
+    (ovenRequired === true || Boolean(ovenFan || ovenTemp || ovenTime));
 
   const notes = asStringArray(recipe.notes);
   const ingredients = asIngredientArray(recipe.ingredients);
@@ -164,15 +169,9 @@ export function RecipeBody({
                 <h2 className="text-base font-semibold text-[var(--color-ink)] tracking-tight">
                   Oven
                 </h2>
-                {ovenRequired !== null ? (
-                  <span
-                    className={
-                      ovenRequired
-                        ? "inline-flex items-center rounded-full border border-teal-200/80 bg-[var(--color-accent-soft)] px-2.5 py-0.5 text-xs font-medium text-[var(--color-accent)]"
-                        : "inline-flex items-center rounded-full border border-[var(--color-border)] bg-[var(--color-canvas)]/80 px-2.5 py-0.5 text-xs font-medium text-[var(--color-muted)]"
-                    }
-                  >
-                    {ovenRequired ? "Required" : "Not required"}
+                {ovenRequired === true ? (
+                  <span className="inline-flex items-center rounded-full border border-teal-200/80 bg-[var(--color-accent-soft)] px-2.5 py-0.5 text-xs font-medium text-[var(--color-accent)]">
+                    Required
                   </span>
                 ) : null}
               </div>
@@ -231,52 +230,121 @@ export function RecipeBody({
             {ingredients.map((ing, i) => {
               const line = formatScaledIngredientLine(ing, factor);
               const proc = asStringArray(ing.processing);
-              const sub = proc.length ? ` (${proc.join(", ")})` : "";
+              const procSuffix = proc.length ? ` (${proc.join(", ")})` : "";
+              const ingNotes = asNotesArray(ing.notes);
+              const substitutions = asRecordStrArray(ing.substitutions);
               const id = `ingredient-${i}`;
               const done = ingredientChecked.has(i);
               const ingLabel =
                 typeof ing.name === "string" && ing.name.trim()
                   ? ing.name.trim()
                   : `Ingredient ${i + 1}`;
+              const mutedDone = done
+                ? "text-[var(--color-muted)] line-through decoration-[var(--color-muted)]"
+                : "";
+              const mutedSoft = done
+                ? "text-[var(--color-muted)]/80 line-through"
+                : "text-[var(--color-muted)]";
               return (
                 <li
                   key={i}
-                  className="recipe-ingredient-row flex gap-3 items-start border-l-2 border-[var(--color-accent)]/30 pl-3 -ml-px print:border-l-0 print:pl-0 print:gap-0"
+                  className="recipe-ingredient-row border-l-2 border-[var(--color-accent)]/30 pl-3 -ml-px print:border-l-0 print:pl-0"
                 >
-                  <input
-                    id={id}
-                    type="checkbox"
-                    checked={done}
-                    onChange={() => toggleIngredient(i)}
-                    className="recipe-ingredient-checkbox mt-1.5 h-4 w-4 shrink-0 rounded border-[var(--color-border)] accent-[var(--color-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] print:hidden"
-                    aria-label={`Mark ${ingLabel} as gathered`}
-                  />
-                  <label
-                    htmlFor={id}
-                    className="flex-1 min-w-0 cursor-pointer select-none"
-                  >
-                    <span
-                      className={
-                        done
-                          ? "text-[var(--color-muted)] line-through decoration-[var(--color-muted)]"
-                          : "text-[var(--color-ink)]"
-                      }
-                    >
-                      {line.primary}
-                      {sub}
-                    </span>
-                    {line.note ? (
-                      <span
-                        className={`block text-sm mt-0.5 ${
-                          done
-                            ? "text-[var(--color-muted)]/80 line-through"
-                            : "text-[var(--color-muted)]"
-                        }`}
+                  <div className="flex gap-3 items-start print:gap-0">
+                    <input
+                      id={id}
+                      type="checkbox"
+                      checked={done}
+                      onChange={() => toggleIngredient(i)}
+                      className="recipe-ingredient-checkbox mt-1.5 h-4 w-4 shrink-0 rounded border-[var(--color-border)] accent-[var(--color-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] print:hidden"
+                      aria-label={`Mark ${ingLabel} as gathered`}
+                    />
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <label
+                        htmlFor={id}
+                        className="block cursor-pointer select-none"
                       >
-                        {line.note}
-                      </span>
-                    ) : null}
-                  </label>
+                        <span
+                          className={
+                            done
+                              ? "text-[var(--color-muted)] line-through decoration-[var(--color-muted)]"
+                              : "text-[var(--color-ink)]"
+                          }
+                        >
+                          {line.primary}
+                          {procSuffix}
+                        </span>
+                        {line.note ? (
+                          <span
+                            className={`mt-0.5 block text-sm ${mutedSoft}`}
+                          >
+                            {line.note}
+                          </span>
+                        ) : null}
+                      </label>
+                      {ingNotes.length > 0 ? (
+                        <ul
+                          className={`list-disc space-y-0.5 pl-5 text-sm ${mutedDone || "text-[var(--color-muted)]"}`}
+                        >
+                          {ingNotes.map((n, ni) => (
+                            <li key={ni}>{n}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                      {substitutions.length > 0 ? (
+                        <div
+                          className={`rounded-md border border-dashed border-[var(--color-border)] bg-[var(--color-paper)]/80 px-3 py-2 ${done ? "opacity-75" : ""}`}
+                        >
+                          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+                            Substitutions
+                          </p>
+                          <ul className="list-none space-y-2 p-0">
+                            {substitutions.map((sub, j) => {
+                              const subLine = formatScaledIngredientLine(
+                                sub,
+                                factor
+                              );
+                              const subProc = asStringArray(sub.processing);
+                              const subSuffix = subProc.length
+                                ? ` (${subProc.join(", ")})`
+                                : "";
+                              const subNotes = asNotesArray(sub.notes);
+                              return (
+                                <li key={j} className="text-sm">
+                                  <span
+                                    className={
+                                      done
+                                        ? "text-[var(--color-muted)] line-through decoration-[var(--color-muted)]"
+                                        : "text-[var(--color-ink)]"
+                                    }
+                                  >
+                                    {subLine.primary}
+                                    {subSuffix}
+                                  </span>
+                                  {subLine.note ? (
+                                    <span
+                                      className={`mt-0.5 block text-xs ${mutedSoft}`}
+                                    >
+                                      {subLine.note}
+                                    </span>
+                                  ) : null}
+                                  {subNotes.length > 0 ? (
+                                    <ul
+                                      className={`mt-1 list-disc space-y-0.5 pl-4 text-xs ${mutedSoft}`}
+                                    >
+                                      {subNotes.map((sn, sni) => (
+                                        <li key={sni}>{sn}</li>
+                                      ))}
+                                    </ul>
+                                  ) : null}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
                 </li>
               );
             })}
@@ -287,12 +355,28 @@ export function RecipeBody({
       {steps.length > 0 ? (
         <section className="steps mb-8" aria-label="Steps">
           <h2 className="text-xl font-semibold mb-3">Steps</h2>
-          <ol className="list-decimal pl-6 space-y-3 marker:text-[var(--color-accent)] marker:font-semibold">
+          <ol className="list-decimal pl-6 space-y-4 marker:text-[var(--color-accent)] marker:font-semibold">
             {steps.map((s, i) => {
               const text = typeof s.step === "string" ? s.step : "";
+              const stepNotes = asNotesArray(s.notes);
+              const haccp = stepHaccpLabel(s.haccp);
               return (
-                <li key={i}>
-                  {text}
+                <li key={i} className="pl-1">
+                  <span className="text-[var(--color-ink)]">{text}</span>
+                  {stepNotes.length > 0 ? (
+                    <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-sm text-[var(--color-muted)] marker:text-[var(--color-muted)]">
+                      {stepNotes.map((n, ni) => (
+                        <li key={ni} className="font-normal">
+                          {n}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {haccp ? (
+                    <p className="mt-1.5 border-l-2 border-amber-200/90 pl-2 text-xs text-amber-950/90">
+                      {haccp}
+                    </p>
+                  ) : null}
                 </li>
               );
             })}
